@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import uuid
+
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -34,7 +36,11 @@ class RetrievedChunk(BaseModel):
     filename: str
     chunk_index: int
     content: str
-    score: float
+    score: float            # final hybrid score
+    vec_score: float = 0.0  # cosine similarity component
+    bm25_score: float = 0.0 # BM25 component
+    kw_hits: int = 0        # number of keywords found in chunk
+    keywords_matched: list[str] = []
 
 
 class ChatRequest(BaseModel):
@@ -45,9 +51,80 @@ class ChatResponse(BaseModel):
     answer: str
     tool_steps: list[ToolStep]
     retrieved_chunks: list[RetrievedChunk]
+    keywords: list[str] = []  # keywords extracted from the question
 
 
 class ChunkStats(BaseModel):
     total_chunks: int
     total_files_chunked: int
     index_size: int
+
+
+# ── Projects ──────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    created_at: datetime
+
+
+# ── Project Files ─────────────────────────────────────────────────────────────
+
+class FileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    filename: str
+    size: int
+    chunk_status: str
+    chunk_count: int
+    uploaded_at: datetime
+
+
+# ── Messages ─────────────────────────────────────────────────────────────────
+
+class MessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    role: str
+    content: str
+    created_at: datetime
+
+
+# ── Agents ────────────────────────────────────────────────────────────────────
+
+class AgentCreate(BaseModel):
+    name: str
+    description: str | None = None
+    system_prompt: str = ""
+    top_k: int = 2
+
+
+class AgentUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    system_prompt: str | None = None
+    top_k: int | None = None
+
+
+class AgentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    description: str | None
+    system_prompt: str
+    top_k: int
+    created_at: datetime

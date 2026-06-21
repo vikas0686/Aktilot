@@ -1,20 +1,42 @@
-# Python
+# ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .venv/
 venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# ── Backend runtime data (never commit these) ─────────────────────────────────
+backend/uploads/
+backend/chroma_data/
 backend/context/
 backend/.env
 
-# Node
+# ── Node ──────────────────────────────────────────────────────────────────────
 frontend/node_modules/
 frontend/dist/
+frontend/.env
+frontend/.env.local
 
-# Env
+# ── Environment / secrets ─────────────────────────────────────────────────────
 .env
 *.env
+!.env.example
+!backend/.env.example
 
-# OS
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite3
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
 .DS_Store
-
+Thumbs.db
 .idea/
+.vscode/
+*.swp

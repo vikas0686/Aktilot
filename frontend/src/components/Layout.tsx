@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Upload, Files, MessageSquare, Moon, Sun } from "lucide-react";
+import { AktilotIcon } from "@/components/AktilotIcon";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { Button } from "@/components/ui/button";
@@ -25,8 +26,8 @@ export function Layout({ children }: LayoutProps) {
       {/* Left Nav */}
       <aside className="flex w-56 flex-col border-r border-border bg-card">
         <div className="flex items-center gap-2 px-4 py-5 border-b border-border">
-          <MessageSquare className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-sm">Doc AI Assistant</span>
+          <AktilotIcon size={22} />
+          <span className="font-semibold text-sm">Aktilot</span>
         </div>
         <nav className="flex-1 p-2 space-y-1">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (

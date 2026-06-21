@@ -1,5 +1,147 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { filesApi, chunksApi, chatApi } from "@/services/api";
+import { projectsApi, projectFilesApi, agentsApi, agentChatApi, filesApi, chunksApi, chatApi } from "@/services/api";
+import type { ProjectFile } from "@/types/api";
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export const PROJECTS_KEY = ["projects"] as const;
+
+export function useProjects() {
+  return useQuery({
+    queryKey: PROJECTS_KEY,
+    queryFn: () => projectsApi.list().then((r) => r.data),
+  });
+}
+
+export function useProject(id: string) {
+  return useQuery({
+    queryKey: [...PROJECTS_KEY, id],
+    queryFn: () => projectsApi.get(id).then((r) => r.data),
+    enabled: !!id,
+  });
+}
+
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string }) =>
+      projectsApi.create(data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PROJECTS_KEY }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => projectsApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: PROJECTS_KEY }),
+  });
+}
+
+// ── Project Files ─────────────────────────────────────────────────────────────
+
+const projectFilesKey = (projectId: string) => ["project-files", projectId] as const;
+
+const isSettling = (f: ProjectFile) =>
+  f.chunk_status === "pending" || f.chunk_status === "chunking";
+
+export function useProjectFiles(projectId: string) {
+  return useQuery({
+    queryKey: projectFilesKey(projectId),
+    queryFn: () => projectFilesApi.list(projectId).then((r) => r.data),
+    enabled: !!projectId,
+    refetchInterval: (query) => {
+      const data = query.state.data as ProjectFile[] | undefined;
+      return data?.some(isSettling) ? 3000 : false;
+    },
+  });
+}
+
+export function useUploadProjectFile(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) =>
+      projectFilesApi.upload(projectId, file).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: projectFilesKey(projectId) }),
+  });
+}
+
+export function useDeleteProjectFile(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fileId: string) => projectFilesApi.delete(projectId, fileId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: projectFilesKey(projectId) }),
+  });
+}
+
+// ── Agents ────────────────────────────────────────────────────────────────────
+
+const agentsKey = (projectId: string) => ["agents", projectId] as const;
+
+type AgentPayload = { name?: string; description?: string; system_prompt?: string; top_k?: number };
+
+export function useProjectAgents(projectId: string) {
+  return useQuery({
+    queryKey: agentsKey(projectId),
+    queryFn: () => agentsApi.listByProject(projectId).then((r) => r.data),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateAgent(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AgentPayload) =>
+      agentsApi.create(projectId, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentsKey(projectId) }),
+  });
+}
+
+export function useUpdateAgent(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, data }: { agentId: string; data: AgentPayload }) =>
+      agentsApi.update(agentId, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentsKey(projectId) }),
+  });
+}
+
+export function useDeleteAgent(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentId: string) => agentsApi.delete(agentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentsKey(projectId) }),
+  });
+}
+
+export function useAgent(agentId: string) {
+  return useQuery({
+    queryKey: ["agent", agentId] as const,
+    queryFn: () => agentsApi.get(agentId).then((r) => r.data),
+    enabled: !!agentId,
+  });
+}
+
+const agentMessagesKey = (agentId: string) => ["agent-messages", agentId] as const;
+
+export function useAgentMessages(agentId: string) {
+  return useQuery({
+    queryKey: agentMessagesKey(agentId),
+    queryFn: () => agentChatApi.messages(agentId).then((r) => r.data),
+    enabled: !!agentId,
+  });
+}
+
+export function useSendAgentMessage(agentId: string) {
+  return useMutation({
+    mutationFn: (question: string) =>
+      agentChatApi.send(agentId, question).then((r) => r.data),
+  });
+}
+
+// ── Legacy (old FAISS-based system) ──────────────────────────────────────────
 
 export const FILES_KEY = ["files"] as const;
 export const STATS_KEY = ["chunk-stats"] as const;

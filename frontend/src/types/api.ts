@@ -1,3 +1,38 @@
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  filename: string;
+  size: number;
+  chunk_status: "pending" | "chunking" | "chunked" | "error";
+  chunk_count: number;
+  uploaded_at: string;
+}
+
+export interface Agent {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  system_prompt: string;
+  top_k: number;
+  created_at: string;
+}
+
+export interface AgentChatMessage {
+  id: string;
+  agent_id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
 export interface FileRecord {
   id: string;
   filename: string;
@@ -22,12 +57,17 @@ export interface RetrievedChunk {
   chunk_index: number;
   content: string;
   score: number;
+  vec_score: number;
+  bm25_score: number;
+  kw_hits: number;
+  keywords_matched: string[];
 }
 
 export interface ChatResponse {
   answer: string;
   tool_steps: ToolStep[];
   retrieved_chunks: RetrievedChunk[];
+  keywords: string[];
 }
 
 export interface ChunkStats {

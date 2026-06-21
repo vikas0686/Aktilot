@@ -1,0 +1,73 @@
+import uuid
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.models.agent import Agent
+
+
+async def create(
+    db: AsyncSession,
+    project_id: uuid.UUID,
+    name: str,
+    description: str | None,
+    system_prompt: str,
+    top_k: int = 2,
+) -> Agent:
+    agent = Agent(
+        project_id=project_id,
+        name=name,
+        description=description,
+        system_prompt=system_prompt,
+        top_k=top_k,
+    )
+    db.add(agent)
+    await db.commit()
+    await db.refresh(agent)
+    return agent
+
+
+async def list_for_project(db: AsyncSession, project_id: uuid.UUID) -> list[Agent]:
+    result = await db.execute(
+        select(Agent)
+        .where(Agent.project_id == project_id)
+        .order_by(Agent.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def get(db: AsyncSession, agent_id: uuid.UUID) -> Agent:
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
+async def update(
+    db: AsyncSession,
+    agent_id: uuid.UUID,
+    name: str | None,
+    description: str | None,
+    system_prompt: str | None,
+    top_k: int | None = None,
+) -> Agent:
+    agent = await get(db, agent_id)
+    if name is not None:
+        agent.name = name
+    if description is not None:
+        agent.description = description
+    if system_prompt is not None:
+        agent.system_prompt = system_prompt
+    if top_k is not None:
+        agent.top_k = top_k
+    await db.commit()
+    await db.refresh(agent)
+    return agent
+
+
+async def delete(db: AsyncSession, agent_id: uuid.UUID) -> None:
+    agent = await get(db, agent_id)
+    await db.delete(agent)
+    await db.commit()
