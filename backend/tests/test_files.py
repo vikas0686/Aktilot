@@ -12,11 +12,14 @@ def _txt_file(content: bytes = b"hello world", filename: str = "sample.txt"):
 
 # ── Upload validation ─────────────────────────────────────────────────────────
 
+
 async def test_upload_rejects_unsupported_extension(client):
     pid = await _create_project(client)
     r = await client.post(
         f"/api/projects/{pid}/files/upload",
-        files={"file": ("malware.exe", io.BytesIO(b"data"), "application/octet-stream")},
+        files={
+            "file": ("malware.exe", io.BytesIO(b"data"), "application/octet-stream")
+        },
     )
     assert r.status_code == 400
     assert "Unsupported" in r.json()["detail"]
@@ -36,12 +39,19 @@ async def test_upload_allowed_extensions(client):
         with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
             r = await client.post(
                 f"/api/projects/{pid}/files/upload",
-                files={"file": (filename, io.BytesIO(b"content"), "application/octet-stream")},
+                files={
+                    "file": (
+                        filename,
+                        io.BytesIO(b"content"),
+                        "application/octet-stream",
+                    )
+                },
             )
         assert r.status_code == 201, f"Expected 201 for {filename}, got {r.status_code}"
 
 
 # ── Upload success ────────────────────────────────────────────────────────────
+
 
 async def test_upload_txt_returns_file_record(client):
     pid = await _create_project(client)
@@ -71,6 +81,7 @@ async def test_upload_sets_pending_chunk_status(client):
 
 # ── List files ────────────────────────────────────────────────────────────────
 
+
 async def test_list_files_empty(client):
     pid = await _create_project(client)
     r = await client.get(f"/api/projects/{pid}/files")
@@ -81,8 +92,12 @@ async def test_list_files_empty(client):
 async def test_list_files_after_upload(client):
     pid = await _create_project(client)
     with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
-        await client.post(f"/api/projects/{pid}/files/upload", files=_txt_file(filename="a.txt"))
-        await client.post(f"/api/projects/{pid}/files/upload", files=_txt_file(filename="b.txt"))
+        await client.post(
+            f"/api/projects/{pid}/files/upload", files=_txt_file(filename="a.txt")
+        )
+        await client.post(
+            f"/api/projects/{pid}/files/upload", files=_txt_file(filename="b.txt")
+        )
     r = await client.get(f"/api/projects/{pid}/files")
     assert r.status_code == 200
     assert len(r.json()) == 2
@@ -95,9 +110,12 @@ async def test_list_files_project_not_found(client):
 
 # ── Delete file ───────────────────────────────────────────────────────────────
 
+
 async def test_delete_file_not_found(client):
     pid = await _create_project(client)
-    r = await client.delete(f"/api/projects/{pid}/files/00000000-0000-0000-0000-000000000000")
+    r = await client.delete(
+        f"/api/projects/{pid}/files/00000000-0000-0000-0000-000000000000"
+    )
     assert r.status_code == 404
 
 

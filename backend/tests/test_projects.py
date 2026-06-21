@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 # ── Create ────────────────────────────────────────────────────────────────────
 
+
 async def test_create_project_minimal(client):
     r = await client.post("/api/projects", json={"name": "Alpha"})
     assert r.status_code == 201
@@ -14,7 +15,9 @@ async def test_create_project_minimal(client):
 
 
 async def test_create_project_with_description(client):
-    r = await client.post("/api/projects", json={"name": "Legal", "description": "Legal docs"})
+    r = await client.post(
+        "/api/projects", json={"name": "Legal", "description": "Legal docs"}
+    )
     assert r.status_code == 201
     assert r.json()["description"] == "Legal docs"
 
@@ -25,6 +28,7 @@ async def test_create_project_name_required(client):
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 async def test_list_projects_empty(client):
     r = await client.get("/api/projects")
@@ -42,6 +46,7 @@ async def test_list_projects_returns_all(client):
 
 # ── Get ───────────────────────────────────────────────────────────────────────
 
+
 async def test_get_project(client):
     pid = (await client.post("/api/projects", json={"name": "Gamma"})).json()["id"]
     r = await client.get(f"/api/projects/{pid}")
@@ -55,6 +60,7 @@ async def test_get_project_not_found(client):
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
+
 
 async def test_delete_project(client):
     pid = (await client.post("/api/projects", json={"name": "To Delete"})).json()["id"]
@@ -73,7 +79,9 @@ async def test_delete_project_not_found(client):
 async def test_delete_project_cascades_agents(client):
     """Deleting a project must also delete all its agents (cascade)."""
     pid = (await client.post("/api/projects", json={"name": "Parent"})).json()["id"]
-    aid = (await client.post(f"/api/projects/{pid}/agents", json={"name": "Child"})).json()["id"]
+    aid = (
+        await client.post(f"/api/projects/{pid}/agents", json={"name": "Child"})
+    ).json()["id"]
     with patch("services.project_service.chroma_delete_project"):
         await client.delete(f"/api/projects/{pid}")
     # The agent should no longer be reachable

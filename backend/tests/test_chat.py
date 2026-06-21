@@ -6,7 +6,9 @@ from models.schemas import ChatResponse
 async def _make_agent(client) -> tuple[str, str]:
     """Returns (project_id, agent_id)."""
     pid = (await client.post("/api/projects", json={"name": "P"})).json()["id"]
-    aid = (await client.post(f"/api/projects/{pid}/agents", json={"name": "A"})).json()["id"]
+    aid = (await client.post(f"/api/projects/{pid}/agents", json={"name": "A"})).json()[
+        "id"
+    ]
     return pid, aid
 
 
@@ -19,6 +21,7 @@ _FAKE_RESPONSE = ChatResponse(
 
 
 # ── 404 guards ────────────────────────────────────────────────────────────────
+
 
 async def test_chat_unknown_agent_returns_404(client):
     r = await client.post(
@@ -41,6 +44,7 @@ async def test_chat_missing_question_returns_422(client):
 
 # ── Message history ───────────────────────────────────────────────────────────
 
+
 async def test_messages_empty_for_new_agent(client):
     _, aid = await _make_agent(client)
     r = await client.get(f"/api/agents/{aid}/messages")
@@ -50,6 +54,7 @@ async def test_messages_empty_for_new_agent(client):
 
 # ── Chat response shape ───────────────────────────────────────────────────────
 
+
 async def test_chat_returns_answer(client):
     _, aid = await _make_agent(client)
     with patch(
@@ -57,7 +62,9 @@ async def test_chat_returns_answer(client):
         new_callable=AsyncMock,
         return_value=_FAKE_RESPONSE,
     ):
-        r = await client.post(f"/api/agents/{aid}/chat", json={"question": "What is 42?"})
+        r = await client.post(
+            f"/api/agents/{aid}/chat", json={"question": "What is 42?"}
+        )
 
     assert r.status_code == 200
     body = r.json()
@@ -74,7 +81,9 @@ async def test_chat_passes_question_to_rag_service(client):
         new_callable=AsyncMock,
         return_value=_FAKE_RESPONSE,
     ) as mock_chat:
-        await client.post(f"/api/agents/{aid}/chat", json={"question": "What is the deadline?"})
+        await client.post(
+            f"/api/agents/{aid}/chat", json={"question": "What is the deadline?"}
+        )
 
     # Verify the service was called with the right question
     call_args = mock_chat.call_args

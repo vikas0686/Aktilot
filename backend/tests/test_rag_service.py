@@ -30,6 +30,7 @@ from services.project_service import create as create_project
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _kw_resp(keywords: list) -> MagicMock:
     m = MagicMock()
     m.choices = [MagicMock()]
@@ -70,20 +71,23 @@ FAKE_CHUNKS = [
         "id": "chunk-1",
         "content": "The invoice total is $500.",
         "metadata": {"filename": "invoice.txt", "chunk_index": 0},
-        "distance": 0.1,   # cosine distance → vec_score = 0.9
+        "distance": 0.1,  # cosine distance → vec_score = 0.9
     },
     {
         "id": "chunk-2",
         "content": "Payment due by January 31.",
         "metadata": {"filename": "invoice.txt", "chunk_index": 1},
-        "distance": 0.4,   # → vec_score = 0.6
+        "distance": 0.4,  # → vec_score = 0.6
     },
 ]
 
 
 # ── Fixture: project + agent in the test DB ───────────────────────────────────
 
-async def _setup(db_session, system_prompt: str = "Answer from context.", top_k: int = 2):
+
+async def _setup(
+    db_session, system_prompt: str = "Answer from context.", top_k: int = 2
+):
     project = await create_project(db_session, "Test Project", None)
     agent = await create_agent(
         db_session, project.id, "Bot", None, system_prompt, top_k
@@ -92,6 +96,7 @@ async def _setup(db_session, system_prompt: str = "Answer from context.", top_k:
 
 
 # ── Happy path ────────────────────────────────────────────────────────────────
+
 
 async def test_chat_returns_chat_response(db_session):
     _, agent = await _setup(db_session)
@@ -108,8 +113,8 @@ async def test_chat_returns_chat_response(db_session):
 
     assert result.answer == "$500."
     assert result.keywords == ["invoice", "total"]
-    assert len(result.tool_steps) == 5   # 5 named pipeline steps
-    assert len(result.retrieved_chunks) == 2   # top_k=2, both chunks returned
+    assert len(result.tool_steps) == 5  # 5 named pipeline steps
+    assert len(result.retrieved_chunks) == 2  # top_k=2, both chunks returned
 
 
 async def test_chat_pipeline_step_names(db_session):
@@ -135,6 +140,7 @@ async def test_chat_pipeline_step_names(db_session):
 
 
 # ── Hybrid scoring ────────────────────────────────────────────────────────────
+
 
 async def test_chat_vec_score_is_one_minus_distance(db_session):
     _, agent = await _setup(db_session)
@@ -202,10 +208,11 @@ async def test_chat_top_k_limits_returned_chunks(db_session):
         mock_client.embeddings.create = AsyncMock(return_value=_embed_resp(FAKE_VECTOR))
         result = await rag_chat(db_session, agent.id, "?")
 
-    assert len(result.retrieved_chunks) == 1   # top_k=1
+    assert len(result.retrieved_chunks) == 1  # top_k=1
 
 
 # ── Edge cases ────────────────────────────────────────────────────────────────
+
 
 async def test_chat_keyword_json_parse_fallback(db_session):
     """When OpenAI returns invalid JSON for keywords, fall back to question.split()."""
@@ -268,6 +275,7 @@ async def test_chat_uses_fallback_system_prompt_when_blank(db_session):
 
 # ── Message persistence ───────────────────────────────────────────────────────
 
+
 async def test_chat_persists_user_and_assistant_messages(db_session):
     """A successful chat must save exactly two messages: user then assistant."""
     _, agent = await _setup(db_session)
@@ -295,9 +303,7 @@ async def test_chat_does_not_persist_messages_on_error(db_session):
     with (
         patch("services.agent_rag_service.client") as mock_client,
     ):
-        mock_client.chat.completions.create = AsyncMock(
-            side_effect=_make_auth_error()
-        )
+        mock_client.chat.completions.create = AsyncMock(side_effect=_make_auth_error())
 
         with pytest.raises(HTTPException):
             await rag_chat(db_session, agent.id, "Test?")
@@ -307,6 +313,7 @@ async def test_chat_does_not_persist_messages_on_error(db_session):
 
 
 # ── Cascade: agent deletion removes messages ──────────────────────────────────
+
 
 async def test_delete_agent_removes_its_messages(db_session):
     """Messages cascade-delete when their parent agent is deleted."""
@@ -330,12 +337,11 @@ async def test_delete_agent_removes_its_messages(db_session):
 
 # ── Error handling ────────────────────────────────────────────────────────────
 
+
 async def test_chat_auth_error_raises_401(db_session):
     _, agent = await _setup(db_session)
     with patch("services.agent_rag_service.client") as mock_client:
-        mock_client.chat.completions.create = AsyncMock(
-            side_effect=_make_auth_error()
-        )
+        mock_client.chat.completions.create = AsyncMock(side_effect=_make_auth_error())
         with pytest.raises(HTTPException) as exc:
             await rag_chat(db_session, agent.id, "Test?")
 
@@ -345,9 +351,7 @@ async def test_chat_auth_error_raises_401(db_session):
 async def test_chat_rate_limit_raises_429(db_session):
     _, agent = await _setup(db_session)
     with patch("services.agent_rag_service.client") as mock_client:
-        mock_client.chat.completions.create = AsyncMock(
-            side_effect=_make_rate_error()
-        )
+        mock_client.chat.completions.create = AsyncMock(side_effect=_make_rate_error())
         with pytest.raises(HTTPException) as exc:
             await rag_chat(db_session, agent.id, "Test?")
 

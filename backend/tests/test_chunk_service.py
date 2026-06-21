@@ -14,6 +14,7 @@ STEP = CHUNK_SIZE - OVERLAP  # 800 — how far each window advances
 
 # ── _split_text ───────────────────────────────────────────────────────────────
 
+
 def test_split_empty_text_returns_empty_list():
     assert _split_text("") == []
 
@@ -61,8 +62,8 @@ def test_split_overlap_region_appears_in_both_chunks():
     chunks = _split_text(text)
     # windows: [0:1000], [800:1800], [1600:2600→1800]
     assert len(chunks) == 3
-    overlap_in_chunk0 = chunks[0][-OVERLAP:]   # last 200 chars of chunk 0
-    overlap_in_chunk1 = chunks[1][:OVERLAP]    # first 200 chars of chunk 1
+    overlap_in_chunk0 = chunks[0][-OVERLAP:]  # last 200 chars of chunk 0
+    overlap_in_chunk1 = chunks[1][:OVERLAP]  # first 200 chars of chunk 1
     assert overlap_in_chunk0 == overlap_in_chunk1 == "b" * OVERLAP
 
 
@@ -77,6 +78,7 @@ def test_split_chunk_count_formula():
 
 
 # ── _read_file ────────────────────────────────────────────────────────────────
+
 
 def test_read_file_plain_text(tmp_path):
     f = tmp_path / "doc.txt"

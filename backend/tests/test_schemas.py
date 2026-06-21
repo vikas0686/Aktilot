@@ -11,6 +11,7 @@ from models.schemas import (
 
 # ── ProjectCreate ─────────────────────────────────────────────────────────────
 
+
 def test_project_create_requires_name():
     with pytest.raises(ValidationError):
         ProjectCreate()  # type: ignore[call-arg]
@@ -29,6 +30,7 @@ def test_project_create_accepts_description():
 
 # ── AgentCreate ───────────────────────────────────────────────────────────────
 
+
 def test_agent_create_requires_name():
     with pytest.raises(ValidationError):
         AgentCreate()  # type: ignore[call-arg]
@@ -42,12 +44,15 @@ def test_agent_create_defaults():
 
 
 def test_agent_create_accepts_all_fields():
-    a = AgentCreate(name="Bot", description="Helpful", system_prompt="Be concise.", top_k=5)
+    a = AgentCreate(
+        name="Bot", description="Helpful", system_prompt="Be concise.", top_k=5
+    )
     assert a.top_k == 5
     assert a.system_prompt == "Be concise."
 
 
 # ── AgentUpdate ───────────────────────────────────────────────────────────────
+
 
 def test_agent_update_all_fields_optional():
     u = AgentUpdate()
@@ -65,6 +70,7 @@ def test_agent_update_partial():
 
 
 # ── ChatRequest ───────────────────────────────────────────────────────────────
+
 
 def test_chat_request_requires_question():
     with pytest.raises(ValidationError):
