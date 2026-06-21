@@ -9,7 +9,7 @@ on:
 jobs:
   # ── Backend ────────────────────────────────────────────────────────────────
   backend:
-    name: Backend — lint & type check
+    name: Backend — lint & test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,9 +25,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install ruff
+        run: pip install -r requirements.txt ruff
 
       - name: Lint (ruff)
         run: ruff check .
@@ -35,9 +33,17 @@ jobs:
       - name: Format check (ruff)
         run: ruff format --check .
 
+      - name: Run tests (pytest)
+        run: pytest --tb=short -q
+        env:
+          # Tests use an in-memory SQLite DB via get_db override; this value is
+          # only needed to satisfy pydantic-settings at import time.
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          OPENAI_API_KEY: "test-key"
+
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
-    name: Frontend — type check & build
+    name: Frontend — type check, build & test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,3 +63,6 @@ jobs:
 
       - name: Build (tsc + vite)
         run: npm run build
+
+      - name: Run tests (vitest)
+        run: npm test
