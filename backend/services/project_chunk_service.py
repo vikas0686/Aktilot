@@ -22,6 +22,7 @@ def _read_file(path: Path) -> str:
         return "\n".join(page.extract_text() or "" for page in reader.pages)
     if path.suffix.lower() in (".doc", ".docx"):
         from docx import Document
+
         doc = Document(str(path))
         return "\n".join(p.text for p in doc.paragraphs)
     return path.read_text(encoding="utf-8", errors="replace")
@@ -39,7 +40,9 @@ async def _embed(texts: list[str]) -> list[list[float]]:
     embeddings: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH):
         batch = texts[i : i + EMBED_BATCH]
-        resp = await client.embeddings.create(model=settings.embedding_model, input=batch)
+        resp = await client.embeddings.create(
+            model=settings.embedding_model, input=batch
+        )
         embeddings.extend([d.embedding for d in resp.data])
     return embeddings
 

@@ -14,7 +14,9 @@ class Message(Base):
         sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     agent_id: Mapped[uuid.UUID] = mapped_column(
-        sa.UUID(as_uuid=True), sa.ForeignKey("agents.id", ondelete="CASCADE"), nullable=False
+        sa.UUID(as_uuid=True),
+        sa.ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
     )
     # user | assistant
     role: Mapped[str] = mapped_column(sa.String(20), nullable=False)

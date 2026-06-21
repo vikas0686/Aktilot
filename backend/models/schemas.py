@@ -35,10 +35,10 @@ class RetrievedChunk(BaseModel):
     filename: str
     chunk_index: int
     content: str
-    score: float            # final hybrid score
+    score: float  # final hybrid score
     vec_score: float = 0.0  # cosine similarity component
-    bm25_score: float = 0.0 # BM25 component
-    kw_hits: int = 0        # number of keywords found in chunk
+    bm25_score: float = 0.0  # BM25 component
+    kw_hits: int = 0  # number of keywords found in chunk
     keywords_matched: list[str] = []
 
 
@@ -61,6 +61,7 @@ class ChunkStats(BaseModel):
 
 # ── Projects ──────────────────────────────────────────────────────────────────
 
+
 class ProjectCreate(BaseModel):
     name: str
     description: str | None = None
@@ -77,6 +78,7 @@ class ProjectResponse(BaseModel):
 
 # ── Project Files ─────────────────────────────────────────────────────────────
 
+
 class FileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,6 +93,7 @@ class FileResponse(BaseModel):
 
 # ── Messages ─────────────────────────────────────────────────────────────────
 
+
 class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -102,6 +105,7 @@ class MessageResponse(BaseModel):
 
 
 # ── Agents ────────────────────────────────────────────────────────────────────
+
 
 class AgentCreate(BaseModel):
     name: str

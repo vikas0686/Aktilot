@@ -1,4 +1,5 @@
 """Persistent ChromaDB vector store, scoped per project."""
+
 import chromadb
 
 from config import settings

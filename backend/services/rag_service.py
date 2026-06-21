@@ -38,14 +38,16 @@ async def chat(question: str) -> ChatResponse:
         t = _now()
         kw_resp = await client.chat.completions.create(
             model=settings.chat_model,
-            messages=[{
-                "role": "user",
-                "content": (
-                    "Extract search keywords from this user query. "
-                    "Return a JSON array of strings only, no explanation.\n"
-                    f"Query: {question}"
-                ),
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Extract search keywords from this user query. "
+                        "Return a JSON array of strings only, no explanation.\n"
+                        f"Query: {question}"
+                    ),
+                }
+            ],
             temperature=0,
         )
         raw = kw_resp.choices[0].message.content or "[]"
@@ -57,7 +59,9 @@ async def chat(question: str) -> ChatResponse:
 
         # Step 2: Search chunks (hybrid: keyword + vector similarity)
         t = _now()
-        embed_resp = await client.embeddings.create(model=settings.embedding_model, input=question)
+        embed_resp = await client.embeddings.create(
+            model=settings.embedding_model, input=question
+        )
         query_vec = embed_resp.data[0].embedding
         vector_results = vector_store.search(query_vec, k=20)
 
@@ -67,22 +71,33 @@ async def chat(question: str) -> ChatResponse:
             kw_hits = sum(1 for kw in keywords if kw.lower() in content_lower)
             kw_score = kw_hits / max(len(keywords), 1)
             final_score = 0.5 * vec_score + 0.5 * kw_score
-            scored.append((
-                RetrievedChunk(
-                    chunk_id=chunk.id,
-                    filename=chunk.filename,
-                    chunk_index=chunk.chunk_index,
-                    content=chunk.content,
-                    score=round(final_score, 4),
-                ),
-                final_score,
-            ))
-        steps.append(_step("Search Chunks", t, f"Query vec + keywords: {keywords}", f"{len(scored)} candidates"))
+            scored.append(
+                (
+                    RetrievedChunk(
+                        chunk_id=chunk.id,
+                        filename=chunk.filename,
+                        chunk_index=chunk.chunk_index,
+                        content=chunk.content,
+                        score=round(final_score, 4),
+                    ),
+                    final_score,
+                )
+            )
+        steps.append(
+            _step(
+                "Search Chunks",
+                t,
+                f"Query vec + keywords: {keywords}",
+                f"{len(scored)} candidates",
+            )
+        )
 
         # Step 3: Rank chunks
         t = _now()
         scored.sort(key=lambda x: x[1], reverse=True)
-        steps.append(_step("Rank Chunks", t, f"{len(scored)} chunks", "Sorted by hybrid score"))
+        steps.append(
+            _step("Rank Chunks", t, f"{len(scored)} chunks", "Sorted by hybrid score")
+        )
 
         # Step 4: Build context
         t = _now()
@@ -90,7 +105,14 @@ async def chat(question: str) -> ChatResponse:
         context_text = "\n\n---\n\n".join(
             f"[{rc.filename} chunk {rc.chunk_index}]\n{rc.content}" for rc in top3
         )
-        steps.append(_step("Build Context", t, f"Top {len(top3)} chunks", f"{len(context_text)} chars of context"))
+        steps.append(
+            _step(
+                "Build Context",
+                t,
+                f"Top {len(top3)} chunks",
+                f"{len(context_text)} chars of context",
+            )
+        )
 
         # Step 5: Generate final response
         t = _now()
@@ -113,10 +135,14 @@ async def chat(question: str) -> ChatResponse:
             temperature=0.2,
         )
         answer = answer_resp.choices[0].message.content or ""
-        steps.append(_step("Generate Final Response", t, question, f"{len(answer)} chars"))
+        steps.append(
+            _step("Generate Final Response", t, question, f"{len(answer)} chars")
+        )
 
     except AuthenticationError:
-        raise HTTPException(401, "Invalid OpenAI API key. Check OPENAI_API_KEY in your .env file.")
+        raise HTTPException(
+            401, "Invalid OpenAI API key. Check OPENAI_API_KEY in your .env file."
+        )
     except RateLimitError:
         raise HTTPException(429, "OpenAI rate limit exceeded. Try again shortly.")
     except HTTPException:
