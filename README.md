@@ -1,110 +1,69 @@
-# Aktilot — Your AI Copilot for Documents
+<div align="center">
 
-Aktilot is an open-source, self-hosted RAG platform. Organise documents into **projects**, create **AI agents** per project with custom system prompts, and chat with your documents — with full visibility into every step of the retrieval pipeline.
+# Aktilot
 
-> All data stays on your infrastructure. No third-party search service required.
+**Chat with your documents. On your infrastructure. No data leaves your servers.**
 
----
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-## Features
-
-- **Multi-project workspace** — keep separate knowledge bases for different teams or use cases
-- **Per-project agents** — multiple agents per project, each with its own system prompt and configurable chunk budget (`top_k`)
-- **Hybrid BM25 + vector retrieval** — cosine similarity (ChromaDB) re-ranked with BM25 for higher precision
-- **Full pipeline transparency** — every step (keyword extraction → vector search → BM25 rank → context assembly → LLM call) surfaced in the chat UI with timings
-- **Source attribution** — each answer shows which document chunks were used, with Vec / BM25 / hybrid score breakdown
-- **Markdown responses** — answers rendered with full GFM (tables, code blocks, lists)
-- **One-command Docker deployment** — PostgreSQL + ChromaDB + backend + frontend, all wired up
-- **Dark mode**
+</div>
 
 ---
 
-## Tech Stack
+## The Problem
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router v6 |
-| Backend | FastAPI, SQLAlchemy 2 (async), Alembic, Pydantic v2 |
-| Vector store | ChromaDB (persistent, per-project collections) |
-| Ranking | OpenAI `text-embedding-3-small` + BM25 (`rank-bm25`) |
-| LLM | OpenAI `gpt-4o-mini` (configurable) |
-| Database | PostgreSQL 16 |
-| Container | Docker Compose |
+Your team has documents everywhere — contracts, reports, runbooks, research papers — and finding answers means either manually digging through files or paying for a hosted AI service that ingests your sensitive data.
+
+Hosted document AI tools are expensive, opaque, and require you to hand over your files to a third party. On the other hand, building your own RAG pipeline from scratch means weeks of engineering work just to get a working prototype.
+
+**Aktilot fills that gap.** It's a self-hosted, open-source platform that lets you upload your documents and ask questions in plain English — in minutes, not weeks, with your data staying exactly where it is.
 
 ---
 
-## Architecture
+## What Aktilot Does
 
-```
-Browser
-  │  React + TypeScript + TanStack Query
-  │  Axios → /api/*
-  ▼
-FastAPI Backend
-  ├── /api/projects          Projects CRUD
-  ├── /api/projects/:id/files   Upload, chunk, delete files
-  ├── /api/projects/:id/agents  Agent management
-  └── /api/agents/:id/chat      RAG chat + message history
-  │
-  ├── PostgreSQL             projects · files · agents · messages
-  ├── ChromaDB               one collection per project (cosine distance)
-  └── OpenAI API             embeddings (text-embedding-3-small) + chat (gpt-4o-mini)
-```
+- **Organize documents into projects** — separate knowledge bases for different teams, clients, or use cases
+- **Create AI agents per project** — each agent gets its own persona and instructions so it answers in the right tone and scope
+- **Ask questions, get cited answers** — every response shows exactly which document chunks it drew from, so you can verify the source
+- **See inside the pipeline** — keyword extraction, vector search, re-ranking, and context assembly are all surfaced in the UI with timings, so nothing is a black box
 
-### RAG Pipeline (per chat request)
-
-```
-Question
-  │
-  ▼  Step 1 — Extract Keywords
-     LLM extracts search terms  →  ["invoice", "due date"]
-  │
-  ▼  Step 2 — Vector Search
-     Embed question → ChromaDB cosine search  →  top 20 candidates
-  │
-  ▼  Step 3 — BM25 + Hybrid Rank
-     BM25Okapi on candidates, normalise
-     final_score = 0.5 × vec_score + 0.5 × bm25_score
-     Sort descending
-  │
-  ▼  Step 4 — Build Context
-     Take agent.top_k chunks (default 2), assemble context string
-  │
-  ▼  Step 5 — Generate Answer
-     System prompt + context + question  →  gpt-4o-mini
-  │
-  ▼
-Answer + keywords + source chunks (with score breakdown) + pipeline steps
-```
+> Aktilot uses a hybrid BM25 + vector retrieval approach that consistently outperforms pure semantic search on precise factual questions.
 
 ---
 
-## Quick Start
+## Screenshots
 
-### Prerequisites
+> *(coming soon)*
 
-- Docker & Docker Compose, **or** Python 3.12+ and Node 20+
-- An OpenAI API key
+---
 
-### Docker (recommended)
+## Getting Started
+
+The fastest way to run Aktilot is with Docker Compose. You need an [OpenAI API key](https://platform.openai.com/api-keys) and Docker installed.
 
 ```bash
 git clone https://github.com/your-org/aktilot.git
 cd aktilot
 
 cp .env.example .env
-# Edit .env and set OPENAI_API_KEY=sk-...
+# Open .env and set: OPENAI_API_KEY=sk-...
 
 docker compose up --build
 ```
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| API docs | http://localhost:8000/docs |
+| App | http://localhost:3000 |
+| Backend | http://localhost:8000 |
 
-### Local Development
+That's it. Create a project, upload a PDF, create an agent, and start asking questions.
+
+---
+
+## Local Development
+
+If you want to contribute or run the services individually:
 
 **Backend**
 
@@ -113,9 +72,9 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env          # set OPENAI_API_KEY and DATABASE_URL
+cp .env.example .env   # set OPENAI_API_KEY and DATABASE_URL
 
-# start postgres (or use Docker just for the DB)
+# Start Postgres via Docker (skip if you have one running)
 docker run -d --name aktilot-db \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=docai \
@@ -130,104 +89,35 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev                   # http://localhost:5173
+npm run dev   # http://localhost:5173
 ```
 
 ---
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` in the project root before running Docker Compose, or copy `backend/.env.example` to `backend/.env` for local development.
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OPENAI_API_KEY` | Yes | — | Your OpenAI API key |
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string (asyncpg driver) |
-| `UPLOAD_DIR` | No | `uploads` | Directory for uploaded files |
-| `CHROMA_DIR` | No | `chroma_data` | Directory for ChromaDB persistence |
-| `CONTEXT_DIR` | No | `context` | Legacy context directory |
-| `CHAT_MODEL` | No | `gpt-4o-mini` | OpenAI chat model |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-small` | OpenAI embedding model |
-
----
-
-## Project Structure
-
-```
-aktilot/
-├── backend/
-│   ├── api/routes/           # projects · files · agents · agent_chat · chat
-│   ├── db/
-│   │   ├── models/           # Project · File · Agent · Message (SQLAlchemy)
-│   │   └── session.py        # async engine + session factory
-│   ├── alembic/              # database migrations
-│   ├── services/             # project · file · agent · RAG · chunk services
-│   ├── vectorstore/          # chroma_store.py — add/search/delete chunks
-│   ├── models/schemas.py     # Pydantic request/response models
-│   ├── config.py             # pydantic-settings env config
-│   ├── main.py               # FastAPI app + router registration
-│   ├── requirements.txt
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── pages/            # ProjectsPage · ProjectDetailPage · ProjectAgentsPage · AgentChatPage
-│   │   ├── components/       # AppShell · Sidebar · AgentsTab · FilesTab · AktilotIcon · ui/
-│   │   ├── hooks/            # useApi · useDarkMode
-│   │   ├── services/         # axios API client
-│   │   └── types/            # TypeScript interfaces
-│   ├── public/               # aktilot-icon.svg
-│   ├── nginx.conf
-│   └── Dockerfile
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-├── LICENSE
-└── README.md
-```
-
----
-
-## API Reference
-
-### Projects
-
-| Method | Endpoint | Description |
+| Variable | Required | Description |
 |---|---|---|
-| `GET` | `/api/projects` | List all projects |
-| `POST` | `/api/projects` | Create a project |
-| `GET` | `/api/projects/:id` | Get a project |
-| `DELETE` | `/api/projects/:id` | Delete project + all files, agents, messages, and vectors |
+| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
+| `DATABASE_URL` | Yes | PostgreSQL connection string (asyncpg) |
+| `CHAT_MODEL` | No | Chat model to use (default: `gpt-4o-mini`) |
+| `EMBEDDING_MODEL` | No | Embedding model (default: `text-embedding-3-small`) |
+| `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
+| `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 
-### Files
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects/:id/files` | List project files |
-| `POST` | `/api/projects/:id/files` | Upload a file (PDF, TXT, DOC, DOCX) |
-| `DELETE` | `/api/projects/:id/files/:fid` | Delete file + its vector chunks |
-
-### Agents
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/projects/:id/agents` | List agents for a project |
-| `POST` | `/api/projects/:id/agents` | Create an agent |
-| `GET` | `/api/agents/:id` | Get an agent |
-| `PUT` | `/api/agents/:id` | Update agent (name, system prompt, top_k) |
-| `DELETE` | `/api/agents/:id` | Delete agent + its message history |
-
-### Chat
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/agents/:id/chat` | Send a question, receive RAG answer |
-| `GET` | `/api/agents/:id/messages` | Retrieve chat history for an agent |
+Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+We welcome contributions of all kinds — bug fixes, new features, documentation improvements, and feedback.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up your dev environment, our branching workflow, code standards, and how to submit a pull request.
+
+If you've found a bug, open an [issue](https://github.com/your-org/aktilot/issues). If you have a feature idea, start a [discussion](https://github.com/your-org/aktilot/discussions) before writing code.
+
+For security vulnerabilities, please do not open a public issue — see [SECURITY.md](SECURITY.md).
 
 ---
 
