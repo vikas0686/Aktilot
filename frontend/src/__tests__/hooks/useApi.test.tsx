@@ -368,7 +368,7 @@ describe("useAgent", () => {
   });
 
   it("does not fetch when agentId is empty", async () => {
-    const { result } = renderHook(() => useAgent(""), { wrapper: makeWrapper() });
+    renderHook(() => useAgent(""), { wrapper: makeWrapper() });
     await new Promise((r) => setTimeout(r, 50));
     expect(agentsApi.get).not.toHaveBeenCalled();
   });

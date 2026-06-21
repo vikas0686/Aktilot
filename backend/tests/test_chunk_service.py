@@ -5,7 +5,6 @@ Tests for the chunking helpers in project_chunk_service:
 """
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from services.project_chunk_service import CHUNK_SIZE, OVERLAP, _read_file, _split_text
@@ -68,16 +67,11 @@ def test_split_overlap_region_appears_in_both_chunks():
 
 
 def test_split_chunk_count_formula():
-    # Number of chunks = ceil((len - OVERLAP) / STEP) when len > 0
-    import math
     for length in [1, 100, 800, 801, 1000, 1600, 3000]:
         text = "x" * length
-        expected = math.ceil((length - OVERLAP) / STEP) if length > OVERLAP else 1
-        # Simpler: just trust our formula matches implementation
         chunks = _split_text(text)
         # At minimum the chunks must cover the whole text
         if chunks:
-            covered = chunks[-1]  # last chunk reaches the end
             end_of_last = (len(chunks) - 1) * STEP + len(chunks[-1])
             assert end_of_last == length, f"length={length} not fully covered"
 

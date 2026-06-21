@@ -1,6 +1,3 @@
-import pytest
-
-
 async def _create_project(client, name: str = "Test Project") -> str:
     r = await client.post("/api/projects", json={"name": name})
     return r.json()["id"]

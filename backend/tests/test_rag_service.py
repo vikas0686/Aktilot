@@ -13,7 +13,6 @@ Only OpenAI and ChromaDB calls are mocked.
 """
 
 import json
-import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
