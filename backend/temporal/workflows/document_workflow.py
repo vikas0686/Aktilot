@@ -25,7 +25,7 @@ with workflow.unsafe.imports_passed_through():
         update_file_status,
     )
 
-TASK_QUEUE = "aktilot-document-queue"
+TASK_QUEUE = "aktilot-queue"
 
 _INFRA_RETRY = RetryPolicy(
     maximum_attempts=10,

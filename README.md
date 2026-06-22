@@ -129,25 +129,13 @@ Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env`
 
 ## How It Works
 
-```
-Upload                Temporal Cluster              Storage
-──────                ────────────────              ───────
-User uploads PDF ──▶ DocumentWorkflow
-                        │
-                        ├─ read & split file    ──▶ disk (uploads/)
-                        ├─ embed chunks         ──▶ OpenAI API   (retried independently)
-                        └─ index to vector DB   ──▶ ChromaDB
+![Aktilot Architecture](docs/aktilot-01-03.png)
 
-Chat
-────
-User asks question ──▶ extract keywords    ──▶ OpenAI API
-                   ──▶ embed query         ──▶ OpenAI API
-                   ──▶ hybrid search       ──▶ ChromaDB (BM25 + vector)
-                   ──▶ generate answer     ──▶ OpenAI API
-                   ──▶ save messages       ──▶ PostgreSQL
-```
+All three workflows run on a **Temporal Cluster** for durable, individually-retryable execution:
 
-Each step in the document pipeline is independently retryable. If OpenAI rate-limits the embedding step, only that step retries — the file is not re-read and the previous step's work is not repeated.
+- **DocumentWorkflow** — chunks, embeds, and indexes uploaded files into ChromaDB. Metadata is stored in Postgres.
+- **ChatWorkflow** — hybrid BM25 + vector retrieval, LLM answer generation, and conversation persistence. Each step is checkpointed; a failed OpenAI call retries alone without re-running earlier steps.
+- **BenchmarkWorkflow** *(coming soon)* — evaluates retrieval quality with Recall@K, MRR, and latency metrics, storing results in an evaluation DB.
 
 ---
 

@@ -1,6 +1,7 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from models.schemas import ChatResponse
+from temporalio.client import WorkflowFailureError
+from temporalio.exceptions import ActivityError, ApplicationError
 
 
 async def _make_agent(client) -> tuple[str, str]:
@@ -12,12 +13,24 @@ async def _make_agent(client) -> tuple[str, str]:
     return pid, aid
 
 
-_FAKE_RESPONSE = ChatResponse(
-    answer="The answer is 42.",
-    tool_steps=[],
-    retrieved_chunks=[],
-    keywords=["answer"],
-)
+# Minimal workflow result dict that ChatWorkflow.run returns
+_FAKE_RESULT = {
+    "answer": "The answer is 42.",
+    "keywords": ["answer"],
+    "chunks": [],
+    "steps": [],
+}
+
+
+def _mock_temporal(result: dict = _FAKE_RESULT):
+    """Context manager that patches get_temporal_client with a mock Temporal client."""
+    mock_tc = MagicMock()
+    mock_tc.execute_workflow = AsyncMock(return_value=result)
+    return patch(
+        "api.routes.agent_chat.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_tc,
+    ), mock_tc
 
 
 # ── 404 guards ────────────────────────────────────────────────────────────────
@@ -57,11 +70,8 @@ async def test_messages_empty_for_new_agent(client):
 
 async def test_chat_returns_answer(client):
     _, aid = await _make_agent(client)
-    with patch(
-        "services.agent_rag_service.chat",
-        new_callable=AsyncMock,
-        return_value=_FAKE_RESPONSE,
-    ):
+    patcher, _ = _mock_temporal()
+    with patcher:
         r = await client.post(
             f"/api/agents/{aid}/chat", json={"question": "What is 42?"}
         )
@@ -74,17 +84,76 @@ async def test_chat_returns_answer(client):
     assert isinstance(body["keywords"], list)
 
 
-async def test_chat_passes_question_to_rag_service(client):
+async def test_chat_passes_question_to_workflow(client):
     _, aid = await _make_agent(client)
-    with patch(
-        "services.agent_rag_service.chat",
-        new_callable=AsyncMock,
-        return_value=_FAKE_RESPONSE,
-    ) as mock_chat:
+    patcher, mock_tc = _mock_temporal()
+    with patcher:
         await client.post(
             f"/api/agents/{aid}/chat", json={"question": "What is the deadline?"}
         )
 
-    # Verify the service was called with the right question
-    call_args = mock_chat.call_args
-    assert call_args.args[2] == "What is the deadline?"
+    # execute_workflow is called as: execute_workflow(ChatWorkflow.run, args=[agent_id, question], ...)
+    call_kwargs = mock_tc.execute_workflow.call_args
+    assert call_kwargs.kwargs["args"][1] == "What is the deadline?"
+
+
+# ── Temporal error → HTTP status propagation ──────────────────────────────────
+
+
+def _workflow_failure(error_type: str | None) -> WorkflowFailureError:
+    """Build the full WorkflowFailureError → ActivityError → ApplicationError chain."""
+    app_err = ApplicationError(
+        "activity error",
+        type=error_type,
+        non_retryable=True,
+    )
+    act_err = ActivityError(
+        message="activity failed",
+        scheduled_event_id=1,
+        started_event_id=2,
+        identity="worker",
+        activity_type="extract_keywords",
+        activity_id="1",
+        retry_state=None,
+    )
+    act_err.__cause__ = app_err
+    return WorkflowFailureError(cause=act_err)
+
+
+async def test_chat_workflow_auth_error_returns_401(client):
+    _, aid = await _make_agent(client)
+    mock_tc = MagicMock()
+    mock_tc.execute_workflow = AsyncMock(side_effect=_workflow_failure("AUTH_ERROR"))
+    with patch(
+        "api.routes.agent_chat.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_tc,
+    ):
+        r = await client.post(f"/api/agents/{aid}/chat", json={"question": "test"})
+    assert r.status_code == 401
+
+
+async def test_chat_workflow_rate_limit_returns_429(client):
+    _, aid = await _make_agent(client)
+    mock_tc = MagicMock()
+    mock_tc.execute_workflow = AsyncMock(side_effect=_workflow_failure("RATE_LIMIT"))
+    with patch(
+        "api.routes.agent_chat.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_tc,
+    ):
+        r = await client.post(f"/api/agents/{aid}/chat", json={"question": "test"})
+    assert r.status_code == 429
+
+
+async def test_chat_workflow_unrecognized_failure_returns_500(client):
+    _, aid = await _make_agent(client)
+    mock_tc = MagicMock()
+    mock_tc.execute_workflow = AsyncMock(side_effect=_workflow_failure(None))
+    with patch(
+        "api.routes.agent_chat.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_tc,
+    ):
+        r = await client.post(f"/api/agents/{aid}/chat", json={"question": "test"})
+    assert r.status_code == 500
