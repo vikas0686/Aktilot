@@ -23,13 +23,40 @@ Hosted document AI tools are expensive, opaque, and require you to hand over you
 
 ## What Aktilot Does
 
-- **Organize documents into projects** — separate knowledge bases for different teams, clients, or use cases
-- **Create AI agents per project** — each agent gets its own persona and instructions so it answers in the right tone and scope
-- **Ask questions, get cited answers** — every response shows exactly which document chunks it drew from, so you can verify the source
-- **See inside the pipeline** — keyword extraction, vector search, re-ranking, and context assembly are all surfaced in the UI with timings, so nothing is a black box
-- **Resilient document processing** — uploads are processed through a durable workflow engine; if embedding fails mid-way due to a rate limit or restart, only the failed step retries — no wasted API calls or lost work
+**Organize your knowledge into projects.**
+Group documents by team, client, or use case. Each project gets its own isolated vector store, so a query against your legal documents never bleeds into your engineering runbooks.
 
-> Aktilot uses a hybrid BM25 + vector retrieval approach that consistently outperforms pure semantic search on precise factual questions.
+**Create AI agents that know their role.**
+Each agent has a configurable system prompt, persona, and retrieval depth (`top_k`). Your customer-facing support bot and your internal audit agent can live in the same project and behave completely differently.
+
+**Upload any document — PDF, Word, or plain text.**
+Drop in a file and Aktilot handles the rest: splitting it into overlapping chunks, embedding each chunk via OpenAI, and indexing it into ChromaDB. The UI shows you live processing status so you always know where a file stands.
+
+**Ask questions, get answers with sources.**
+Every response includes the exact document chunks it was built from — filename, chunk position, and relevance score. No hallucination hiding behind a confident tone; you can trace every answer back to a sentence.
+
+**See every step of the retrieval pipeline.**
+The UI exposes the full pipeline trace for each query: which keywords were extracted, how many candidates came back from vector search, how they were re-ranked, what context was assembled, and how long each step took. Nothing is a black box.
+
+**Resilient by design — not by accident.**
+Document ingestion and chat both run as durable Temporal workflows. Every activity is checkpointed. If OpenAI rate-limits you mid-pipeline, only the failed step retries automatically — the work already done is not repeated and no API credits are wasted.
+
+**Runs entirely on your infrastructure.**
+Postgres, ChromaDB, and the worker all run in Docker. Your documents never leave your network. You control the OpenAI key, the storage, and the retention policy.
+
+> Aktilot uses a hybrid BM25 + vector retrieval approach — combining keyword overlap scoring with semantic similarity — which consistently outperforms pure vector search on precise factual questions like dates, names, and figures.
+
+---
+
+## How It Works
+
+![Aktilot Architecture](docs/aktilot-01-03.png)
+
+All three workflows run on a **Temporal Cluster** for durable, individually-retryable execution:
+
+- **DocumentWorkflow** — chunks, embeds, and indexes uploaded files into ChromaDB. Metadata is stored in Postgres.
+- **ChatWorkflow** — hybrid BM25 + vector retrieval, LLM answer generation, and conversation persistence. Each step is checkpointed; a failed OpenAI call retries alone without re-running earlier steps.
+- **BenchmarkWorkflow** *(coming soon)* — evaluates retrieval quality with Recall@K, MRR, and latency metrics, storing results in an evaluation DB.
 
 ---
 
@@ -124,18 +151,6 @@ cd frontend && npm test
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
-
----
-
-## How It Works
-
-![Aktilot Architecture](docs/aktilot-01-03.png)
-
-All three workflows run on a **Temporal Cluster** for durable, individually-retryable execution:
-
-- **DocumentWorkflow** — chunks, embeds, and indexes uploaded files into ChromaDB. Metadata is stored in Postgres.
-- **ChatWorkflow** — hybrid BM25 + vector retrieval, LLM answer generation, and conversation persistence. Each step is checkpointed; a failed OpenAI call retries alone without re-running earlier steps.
-- **BenchmarkWorkflow** *(coming soon)* — evaluates retrieval quality with Recall@K, MRR, and latency metrics, storing results in an evaluation DB.
 
 ---
 
