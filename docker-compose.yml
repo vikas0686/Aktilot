@@ -14,6 +14,31 @@ services:
       timeout: 5s
       retries: 10
 
+  temporal:
+    image: temporalio/auto-setup:latest
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    ports:
+      - "8233:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+    restart: on-failure
+
   backend:
     build: ./backend
     ports:
@@ -21,6 +46,7 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/docai
+      - TEMPORAL_ADDRESS=temporal:7233
       - UPLOAD_DIR=uploads
       - CHROMA_DIR=chroma_data
       - CONTEXT_DIR=context
@@ -31,6 +57,29 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      temporal:
+        condition: service_started
+    restart: on-failure
+
+  worker:
+    build: ./backend
+    command: python -m temporal.worker
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/docai
+      - TEMPORAL_ADDRESS=temporal:7233
+      - UPLOAD_DIR=uploads
+      - CHROMA_DIR=chroma_data
+      - CONTEXT_DIR=context
+    volumes:
+      - uploads_data:/app/uploads
+      - chroma_data:/app/chroma_data
+      - context_data:/app/context
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
     restart: on-failure
 
   frontend:

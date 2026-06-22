@@ -1,247 +1,268 @@
-Phase 1 — Backend Infrastructure
+Full Temporal Integration Plan
 
-Task 1.1 — PostgreSQL connection + Alembic setup
-- Add asyncpg, sqlalchemy[asyncio], alembic to requirements
-- Create db/session.py with async engine + session factory
-- Init Alembic (alembic init), configure env.py to use the async engine
-- Test: alembic upgrade head runs without error on empty DB
+What you have now and why it breaks
 
-Task 1.2 — Project table + migration
-- Define Project SQLAlchemy model (id, name, description, created_at)
-- Generate migration 001_create_projects
-- Test: table exists in DB after alembic upgrade head
-
-Task 1.3 — File table + migration
-- Define File model (id, project_id FK, filename, filepath, size, chunk_status, chunk_count, uploaded_at)
-- Generate migration 002_create_files
-- Test: table exists, FK to projects enforced
-
-Task 1.4 — Agent table + migration
-- Define Agent model (id, project_id FK, name, description, system_prompt, created_at)
-- Generate migration 003_create_agents
-- Test: table exists, FK to projects enforced
-
-Task 1.5 — Message table + migration
-- Define Message model (id, agent_id FK, r
-- Generate migration 004_create_messages
-- Test: table exists, FK to agents enforced
-
-Task 1.6 — ChromaDB persistent client setu
-- Add chromadb to requirements
-- Create vectorstore/chroma_store.py with a persistent client pointed at a configurable path
-- Helper: get_collection(project_id) — returns or creates a named collection per project
-- Helper: add_chunks(project_id, chunks, e, query_vec, k), delete_file(project_id,file_id)
-- Test: create a collection, add a doc, sesurvives process restart
-
-Task 1.7 — Filesystem storage setup
-- Add UPLOAD_DIR to config (e.g. ./uploads/{project_id}/)
-- Helper to resolve file path given projec
-- Test: directory auto-created per project
+┌─────────────────────────────────────────┬───────────────────────────────────────────────────────────────────┐
+│                 Current                 │                              Problem                              │
+├─────────────────────────────────────────┼───────────────────────────────────────────────────────────────────┤
+│ BackgroundTasks.add_task(chunk_file,    │ Server restart → task silently lost, file stays pending forever   │
+│ ...)                                    │                                                                   │
+├────────────────────────────────────────────────────────────────────────────────┤
+│ agent_rag_service.chat() — monolithic   │ OpenAI call 1 succeeds ($), ChromaDB fails → whole thing retries  │
+│                                         gain                                   │
+├─────────────────────────────────────────┼───────────────────────────────────────────────────────────────────┤
+│ No benchmark pipeline                   durability, no parallel evaluation     │
+└────────────────────────────────────────────────────────────────────────────────┘
 
 ---
-Phase 2 — Projects API
+New file structure
 
-Task 2.1 — Create project endpoint
-- POST /api/projects — body: {name, description}
-- Inserts into DB, returns ProjectRecord
-- Test: 201 with project id returned
-
-Task 2.2 — List projects endpoint
-- GET /api/projects — returns list of all
-- Test: empty list on fresh DB, populated after creates
-
-Task 2.3 — Get project endpoint
-- GET /api/projects/{project_id} — returns
-- Test: 404 on unknown id, 200 with correc
-
-Task 2.4 — Delete project endpoint
-- DELETE /api/projects/{project_id} — deletes project, cascades to files + agents + messages in DB
-- Also deletes filesystem files and Chromat
-- Test: 204 on success, subsequent GET returns 404
-
----
-Phase 3 — File Upload + Auto-Chunking
-
-Task 3.1 — Upload file endpoint
-- POST /api/projects/{project_id}/files/upload — multipart
-- Save file to uploads/{project_id}/filena
-- Insert File record in DB with chunk_stat
-- Trigger chunking as a FastAPI Background
-- Return FileRecord immediately
-- Test: file appears on disk, DB record created, status starts as "pending"
-
-Task 3.2 — Chunk service (ChromaDB-backed)
-- Read file text (PDF / DOCX / TXT)
-- Split into chunks (1000 chars, 200 overl
-- Embed via OpenAI in batches
-- Store in ChromaDB collection for that project, with metadata: {file_id, filename, chunk_index}
-- Update DB File record: chunk_status = "chunked", chunk_count = N
-- Test: after chunking, ChromaDB collectioed
-
-Task 3.3 — List files endpoint
-- GET /api/projects/{project_id}/files — returns all files for project with chunk status
-- Test: empty on new project, reflects sta
-
-Task 3.4 — Delete file endpoint
-- DELETE /api/projects/{project_id}/files/{file_id}
-- Remove from filesystem, delete chunks fr
-- Test: file gone from disk, chunks removed from ChromaDB, 404 on subsequent GET
+backend/
+temporal/
+client.py                     # get_temporal_client() + FastAPI dependency
+worker.py                     # entryps + activities
+workflows/
+document_workflow.py
+chat_workflow.py
+benchmark_workflow.py
+eval_query_workflow.py      # child
+activities/
+document_activities.py
+chat_activities.py
+benchmark_activities.py
+db/models/
+eval_run.py                   # NEW
+eval_result.py                # NEW
+alembic/versions/
+006_create_eval_tables.py     # NEW
 
 ---
-Phase 4 — Agents API
+Phase 0 — Infrastructure
 
-Task 4.1 — Create agent endpoint
-- POST /api/projects/{project_id}/agents — body: {name, description, system_prompt}
-- Insert into DB, return AgentRecord
-- Test: 201 with agent id, FK to project validated
+docker-compose.yml additions:
+temporal:
+image: temporalio/auto-setup:latest
+ports: ["7233:7233"]
 
-Task 4.2 — List agents endpoint
-- GET /api/projects/{project_id}/agents
-- Test: returns only agents belonging to t
+temporal-ui:
+image: temporalio/ui:latest
+ports: ["8233:8080"]
+environment:
+TEMPORAL_ADDRESS: temporal:7233
 
-Task 4.3 — Get agent endpoint
-- GET /api/agents/{agent_id} — returns age
-- Test: 404 on unknown id
+requirements.txt addition:
+temporalio>=1.7
 
-Task 4.4 — Update agent endpoint
-- PUT /api/agents/{agent_id} — partial updystem_prompt
-- Test: changes persist in DB
+temporal/client.py:
+from temporalio.client import Client
 
-Task 4.5 — Delete agent endpoint
-- DELETE /api/agents/{agent_id} — deletes
-- Test: 204, messages gone
+_client: Client | None = None
 
----
-Phase 5 — Chat / RAG Pipeline
+async def get_temporal_client() -> Client:
+global _client
+if _client is None:
+_client = await Client.connect("lo
+return _client
 
-Task 5.1 — Chat endpoint (RAG with agent s
-- POST /api/agents/{agent_id}/chat — body: {question}
-- Load agent from DB to get system_prompt
-- Run RAG pipeline (below), inject agent s
-- Persist user message + assistant message
-- Return answer + tool steps + retrieved chunks
-- Test: answer returned, 2 messages saved in DB
-
-Task 5.2 — RAG pipeline (per-project ChromaDB)
-- Step 1: LLM keyword extraction from ques
-- Step 2: Embed question → ChromaDB search 20)
-- Step 3: Hybrid re-rank (vector score + keyword match, 0.5/0.5)
-- Step 4: Build context from top 3 chunks
-- Step 5: LLM final answer — use agent's system_prompt as the system message
-- Test: each step produces expected output in LLM call
-
-Task 5.3 — Chat history endpoint
-- GET /api/agents/{agent_id}/messages — re
-- Test: messages returned in created_at order
+temporal/worker.py — runs as a separate pr
+asyncio.run(Worker(client, task_queue="akt
+workflows=[DocumentWorkflow, ChatWorkflow, BenchmarkWorkflow, EvalQueryWorkflow],
+activities=[...all activities...]).run
 
 ---
-Phase 6 — Frontend: Projects
+Phase 1 — DocumentWorkflow
 
-Task 6.1 — Projects list page
-- Route: / — shows all projects as cards (te)
-- Empty state if none
-- Test: renders project cards from API
+Replaces: background_tasks.add_task(chunk_ect_files.py
 
-Task 6.2 — Create project modal
-- Button on projects list → modal with nam
-- On submit: POST /api/projects, close modal, refresh list
-- Test: new project appears without page reload
+Activities (temporal/activities/document_activities.py)
 
-Task 6.3 — Delete project
-- Delete button on project card with confirmation
-- Test: project disappears from list after confirm
+update_file_status(file_id, status, chunk_count?)   ← Postgres  retry: 10x, 500ms backoff
+read_and_split_file(file_id) → list[str]   3x, skip FileNotFoundError
+clear_existing_vectors(project_id, file_id)         ← ChromaDB   retry: 10x
+embed_chunks(chunks) → list[list[float]]   10x, exp backoff, skip 401
+index_to_chroma(project_id, file_id, chunks, vecs)  ← ChromaDB   retry: 10x
 
-Task 6.4 — Project detail page shell
-- Route: /projects/{id} — shows project name, two tabs: "Files" and "Agents"
-- Test: navigating to /projects/{id} loads
+Workflow (temporal/workflows/document_work
 
----
-Phase 7 — Frontend: File Management
+@workflow.defn
+class DocumentWorkflow:
+@workflow.run
+async def run(self, file_id: str, proj
+await execute_activity(update_file_status, ["chunking"], ...)
 
-Task 7.1 — File upload zone in project det
-- Drag-and-drop + click-to-browse in "Files" tab
-- On drop/select: POST /api/projects/{id}/files/upload
-- Show upload spinner per file
-- Test: file appears in list after upload
+        chunks = await execute_activity(          # checkpointed
+            read_and_split_file, [file_id]
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maxim
+        )
 
-Task 7.2 — File list with chunk status
-- Table of files: name, size, chunk status badge (pending / chunking / chunked / error)
-- Poll GET /api/projects/{id}/files every ing"/"chunking" state, stop when all
-  settled
-- Test: badge updates from "pending" → "ch
+        await execute_activity(clear_existe_id], ...)
 
-Task 7.3 — Delete file from UI
-- Delete button per row → confirm → DELETEle_id}
-- Test: row removed from table
+        vectors = await execute_activity(         # checkpointed — if this fails mid-batch,
+            embed_chunks, [chunks],               # only embed_chunks retries, not read/split
+            start_to_close_timeout=timedel
+            retry_policy=OPENAI_RETRY,
+        )
 
----
-Phase 8 — Frontend: Agent Management
+        await execute_activity(index_to_chhunks, vectors], ...)
+        await execute_activity(update_file_status, ["chunked", len(chunks)], ...)
 
-Task 8.1 — Agents list in project detail
-- "Agents" tab lists agents (name, descrip
-- Empty state with "Create Agent" prompt
-- Test: agents load for current project
+FastAPI change (api/routes/project_files.p
 
-Task 8.2 — Create/edit agent form
-- Modal with: Name, Description, System Prompt (textarea)
-- Create: POST /api/projects/{id}/agents
-- Edit: PUT /api/agents/{id} (pre-filled form)
-- Test: new agent appears in list, edits p
+# Remove:
+background_tasks.add_task(project_chunk_service.chunk_file, str(record.id), str(project_id))
 
-Task 8.3 — Delete agent
-- Delete button on agent row with confirmation
-- Test: agent removed from list
+# Add:
+tc = await get_temporal_client()
+await tc.start_workflow(
+DocumentWorkflow.run,
+args=[str(record.id), str(project_id)],
+id=f"doc-{record.id}",          # idempotent — safe to re-upload same file
+task_queue="aktilot-queue",
+)
 
 ---
-Phase 9 — Frontend: Chat UI
+Phase 2 — ChatWorkflow
 
-Task 9.1 — Agent chat page
-- Route: /agents/{agent_id}/chat
-- Shows agent name + description in header
-- Chat thread (user right, assistant left), input bar + send button
-- Test: page loads with correct agent name
+Replaces: direct await agent_rag_service.cn api/routes/agent_chat.py
 
-Task 9.2 — Send message + display response
-- Send question → POST /api/agents/{agent_id}/chat
-- Show "Thinking…" spinner while pending
-- Append user + assistant messages to thre
-- Test: response appears after send
+Activities (temporal/activities/chat_activ
 
-Task 9.3 — Chat history on load
-- On page load fetch GET /api/agents/{agent_id}/messages and pre-populate thread
-- Test: previous messages visible when rev
+get_agent_config(agent_id) → dict          ← Postgres    retry: 5x
+extract_keywords(question) → list[str]     backoff, skip 401
+embed_query(question) → list[float]        ← OpenAI      retry: 4x, exp backoff, skip 401
+search_vectors(project_id, vec, kws) → … ←ms backoff
+hybrid_rank(raw, kws, top_k) → list
+generate_answer(question, ctx, prompt) → str ← OpenAI    retry: 4x, exp backoff, skip 401
+persist_messages(agent_id, q, a)           ← Postgres    retry: 10x
 
-Task 9.4 — RAG side panel in chat
-- On each assistant response, show collaps
-    - Tool steps (name, duration, input/output summary)
-    - Retrieved chunks (filename, score, exp
-- Test: side panel renders with correct st
+Checkpoint map — what gets saved vs what retries
+
+Step 1: extract_keywords  ✓ ($)  ← checkpointed
+Step 2: embed_query       ✓ ($)  ← checkpointed
+Step 3: search_vectors    ✗      ← ONLY THIS retries, steps 1+2 results reused
+Step 3: search_vectors    ✓      ← checkpo
+Step 4: hybrid_rank       ✓
+Step 5: generate_answer   ✓ ($)  ← checkpo
+Step 6: persist_messages  ✓
+
+Retry policies
+
+OPENAI_RETRY = RetryPolicy(
+maximum_attempts=4,
+initial_interval=timedelta(seconds=2),
+backoff_coefficient=2.0,
+maximum_interval=timedelta(seconds=60),
+non_retryable_error_types=["Authenticaail fast
+)
+
+INFRA_RETRY = RetryPolicy(
+maximum_attempts=10,
+initial_interval=timedelta(milliseconds=500),
+backoff_coefficient=1.5,
+)
+
+FastAPI change (api/routes/agent_chat.py)
+
+# execute_workflow waits for result — HTTPflow completes
+tc = await get_temporal_client()
+result = await tc.execute_workflow(
+ChatWorkflow.run,
+args=[str(agent_id), request.question],
+id=f"chat-{uuid4()}",
+task_queue="aktilot-queue",
+execution_timeout=timedelta(minutes=2)
+)
 
 ---
-Summary Table
+Phase 3 — BenchmarkWorkflow
 
-┌──────────────────────┬─────────┬──────────────────────────────────────────────────────────────────┐
-│        Phase         │  Tasks  │        ble                          │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 1 — Infra            │ 1.1–1.7 │ DB migr filesystem setup            │
-├──────────────────────┼─────────┼─────────────────────────────────────┤
-│ 2 — Projects API     │ 2.1–2.4 │ CRUD en                             │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 3 — Files + Chunking │ 3.1–3.4 │ Upload,, delete                     │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 4 — Agents API       │ 4.1–4.5 │ CRUD en                             │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 5 — Chat / RAG       │ 5.1–5.3 │ RAG pipjection, message persistence │
-├──────────────────────┼─────────┼─────────────────────────────────────┤
-│ 6 — UI: Projects     │ 6.1–6.4 │ List, c                             │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 7 — UI: Files        │ 7.1–7.3 │ Upload,                             │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 8 — UI: Agents       │ 8.1–8.3 │ List, c                             │
-├──────────────────────┼─────────┼──────────────────────────────────────────────────────────────────┤
-│ 9 — UI: Chat         │ 9.1–9.4 │ Chat UIpanel                        │
-└──────────────────────┴─────────┴─────────────────────────────────────┘
+New DB models
 
-Total: 30 tasks — each independently deployable and verifiable.
+EvalRun    id, agent_id, dataset_path, sta
+recall_at_k, mrr, avg_latency_ms, created_at, completed_at
 
-Phases 1–5 (backend) can be built and teste frontend. Phases 6–9 depend only on theAPI contracts being stable, so frontend wos are done.
+EvalResult id, run_id, query, recall_at_k, mrr, latency_ms,
+retrieved_chunk_ids (JSON), rel
+
+Dataset format (JSON file you provide)
+
+[
+{
+"query": "What is the invoice total?",
+"relevant_chunk_ids": ["chunk-abc", "c
+}
+]
+
+Workflow design
+
+BenchmarkWorkflow(agent_id, dataset_path)
+│
+├── Activity: create_eval_run(agent_id)
+├── Activity: load_dataset(path)
+│
+├── for each test_case (in parallel, max 5 concurrent):
+│     └── child EvalQueryWorkflow(run_id
+│           ├── reuses ChatWorkflow activities (extract_keywords → … → generate_answer)
+│           ├── Activity: score_results(retrieved, relevant) → Recall@K, MRR, latency
+│           └── Activity: save_eval_result(run_id, scores)
+│
+└── Activity: finalize_run(run_id)             → aggregate avg metrics, mark completed
+
+Sub-workflow parallelism
+
+# In BenchmarkWorkflow:
+handles = await asyncio.gather(*[
+workflow.start_child_workflow(
+EvalQueryWorkflow.run,
+args=[run_id, agent_id, case],
+id=f"eval-{run_id}-{i}",
+)
+for i, case in enumerate(test_cases)
+])
+await asyncio.gather(*handles)   # wait fo
+
+New API routes
+
+POST /api/benchmarks          body: {agent_id, dataset_path}  → {run_id}
+GET  /api/benchmarks/{run_id}             n with results
+GET  /api/benchmarks/{run_id}/results                          → list[EvalResult]
+
+---
+Retry policy summary
+
+┌─────────────────────┬────────────┬──────────┐
+│      Activity       │ Dependency │   Max retries   │       Skip on       │
+├─────────────────────┼────────────┼──────────┤
+│ read_and_split_file │ Disk       │ 3    r   │
+├─────────────────────┼────────────┼──────────┤
+│ embed_chunks        │ OpenAI     │ 10, eror │
+├─────────────────────┼────────────┼──────────┤
+│ index_to_chroma     │ ChromaDB   │ 10              │ —                   │
+├─────────────────────┼────────────┼──────────┤
+│ update_file_status  │ Postgres   │ 10       │
+├─────────────────────┼────────────┼──────────┤
+│ extract_keywords    │ OpenAI     │ 4, exp backoff  │ AuthenticationError │
+├─────────────────────┼────────────┼──────────┤
+│ embed_query         │ OpenAI     │ 4, exp backoff  │ AuthenticationError │
+├─────────────────────┼────────────┼──────────┤
+│ search_vectors      │ ChromaDB   │ 10, 500ms       │ —                   │
+├─────────────────────┼────────────┼──────────┤
+│ hybrid_rank         │ CPU        │ 3        │
+├─────────────────────┼────────────┼──────────┤
+│ generate_answer     │ OpenAI     │ 4, exp backoff  │ AuthenticationError │
+├─────────────────────┼────────────┼──────────┤
+│ persist_messages    │ Postgres   │ 10              │ —                   │
+└─────────────────────┴────────────┴──────────┘
+
+---
+Implementation order
+
+Week 1:  Phase 0 (infrastructure) + Phase 1 (DocumentWorkflow)
+→ immediate fix for the silent lo
+
+Week 2:  Phase 2 (ChatWorkflow)
+→ individual retries, no wasted L
+
+Week 3:  Phase 3 (BenchmarkWorkflow)
+→ evaluation infrastructure

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/docai"
     upload_dir: Path = Path("uploads")
     chroma_dir: Path = Path("chroma_data")
+    temporal_address: str = "localhost:7233"
 
     model_config = {"env_file": ".env"}
 

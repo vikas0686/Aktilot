@@ -4,23 +4,6 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 
-class FileRecord(BaseModel):
-    id: str
-    filename: str
-    size: int
-    uploaded_at: datetime
-    chunk_status: str = "not_chunked"  # not_chunked | chunking | chunked
-    chunk_count: int = 0
-
-
-class ChunkRecord(BaseModel):
-    id: str
-    file_id: str
-    filename: str
-    chunk_index: int
-    content: str
-
-
 class ToolStep(BaseModel):
     name: str
     start_time: datetime
@@ -51,12 +34,6 @@ class ChatResponse(BaseModel):
     tool_steps: list[ToolStep]
     retrieved_chunks: list[RetrievedChunk]
     keywords: list[str] = []  # keywords extracted from the question
-
-
-class ChunkStats(BaseModel):
-    total_chunks: int
-    total_files_chunked: int
-    index_size: int
 
 
 # ── Projects ──────────────────────────────────────────────────────────────────

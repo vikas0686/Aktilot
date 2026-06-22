@@ -1,13 +1,9 @@
-import uuid
 from pathlib import Path
 
-from openai import AsyncOpenAI, AuthenticationError, RateLimitError
+from openai import AsyncOpenAI
 from pypdf import PdfReader
 
 from config import settings
-from db.session import AsyncSessionFactory
-from services.project_file_service import get as get_file
-from vectorstore.chroma_store import add_chunks, delete_file as chroma_delete_file
 
 client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -45,54 +41,3 @@ async def _embed(texts: list[str]) -> list[list[float]]:
         )
         embeddings.extend([d.embedding for d in resp.data])
     return embeddings
-
-
-async def chunk_file(file_id: str, project_id: str) -> None:
-    """Background task: read → split → embed → store in ChromaDB → update DB status.
-
-    Opens its own DB session because the request session is closed before this runs.
-    """
-    fid = uuid.UUID(file_id)
-
-    async with AsyncSessionFactory() as db:
-        record = await get_file(db, fid)
-        record.chunk_status = "chunking"
-        await db.commit()
-
-        try:
-            path = Path(record.filepath)
-            if not path.exists():
-                raise FileNotFoundError(f"File not on disk: {path}")
-
-            text = _read_file(path)
-            raw_chunks = _split_text(text)
-
-            chunks = [
-                {
-                    "id": str(uuid.uuid4()),
-                    "file_id": file_id,
-                    "filename": record.filename,
-                    "chunk_index": i,
-                    "content": chunk,
-                }
-                for i, chunk in enumerate(raw_chunks)
-            ]
-
-            # Clear any previous vectors for this file before re-inserting
-            chroma_delete_file(project_id, file_id)
-
-            embeddings = await _embed([c["content"] for c in chunks])
-            add_chunks(project_id, chunks, embeddings)
-
-            record.chunk_status = "chunked"
-            record.chunk_count = len(chunks)
-            await db.commit()
-
-        except (AuthenticationError, RateLimitError):
-            record.chunk_status = "error"
-            await db.commit()
-            raise
-        except Exception:
-            record.chunk_status = "error"
-            await db.commit()
-            raise

@@ -1,5 +1,16 @@
 import io
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _mock_temporal():
+    """Return a patch that replaces get_temporal_client with a no-op mock."""
+    mock_client = MagicMock()
+    mock_client.start_workflow = AsyncMock()
+    return patch(
+        "api.routes.project_files.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_client,
+    )
 
 
 async def _create_project(client, name: str = "P") -> str:
@@ -36,7 +47,7 @@ async def test_upload_rejects_missing_project(client):
 async def test_upload_allowed_extensions(client):
     pid = await _create_project(client)
     for filename in ("doc.pdf", "doc.txt", "doc.docx"):
-        with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
+        with _mock_temporal():
             r = await client.post(
                 f"/api/projects/{pid}/files/upload",
                 files={
@@ -55,7 +66,7 @@ async def test_upload_allowed_extensions(client):
 
 async def test_upload_txt_returns_file_record(client):
     pid = await _create_project(client)
-    with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
+    with _mock_temporal():
         r = await client.post(
             f"/api/projects/{pid}/files/upload",
             files=_txt_file(b"hello world"),
@@ -71,12 +82,32 @@ async def test_upload_txt_returns_file_record(client):
 
 async def test_upload_sets_pending_chunk_status(client):
     pid = await _create_project(client)
-    with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
+    with _mock_temporal():
         r = await client.post(
             f"/api/projects/{pid}/files/upload",
             files=_txt_file(),
         )
     assert r.json()["chunk_status"] == "pending"
+
+
+async def test_upload_triggers_workflow(client):
+    """start_workflow must be called once per upload with the file id and project id."""
+    pid = await _create_project(client)
+    mock_client = MagicMock()
+    mock_client.start_workflow = AsyncMock()
+    with patch(
+        "api.routes.project_files.get_temporal_client",
+        new_callable=AsyncMock,
+        return_value=mock_client,
+    ):
+        r = await client.post(f"/api/projects/{pid}/files/upload", files=_txt_file())
+
+    assert r.status_code == 201
+    mock_client.start_workflow.assert_called_once()
+    call_kwargs = mock_client.start_workflow.call_args
+    # workflow id must embed the file id for idempotency
+    file_id = r.json()["id"]
+    assert call_kwargs.kwargs["id"] == f"doc-{file_id}"
 
 
 # ── List files ────────────────────────────────────────────────────────────────
@@ -91,7 +122,7 @@ async def test_list_files_empty(client):
 
 async def test_list_files_after_upload(client):
     pid = await _create_project(client)
-    with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
+    with _mock_temporal():
         await client.post(
             f"/api/projects/{pid}/files/upload", files=_txt_file(filename="a.txt")
         )
@@ -121,7 +152,7 @@ async def test_delete_file_not_found(client):
 
 async def test_delete_file_removes_it(client):
     pid = await _create_project(client)
-    with patch("services.project_chunk_service.chunk_file", new_callable=AsyncMock):
+    with _mock_temporal():
         fid = (
             await client.post(f"/api/projects/{pid}/files/upload", files=_txt_file())
         ).json()["id"]

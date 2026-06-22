@@ -1,9 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import files, chunks, chat, projects, project_files, agents, agent_chat
+from api.routes import agent_chat, agents, project_files, projects
+from temporal.client import close_temporal_client, init_temporal_client
 
-app = FastAPI(title="Document AI Assistant")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_temporal_client()
+    yield
+    close_temporal_client()
+
+
+app = FastAPI(title="Document AI Assistant", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,9 +28,6 @@ app.include_router(project_files.router)
 app.include_router(agents.project_router)
 app.include_router(agents.agent_router)
 app.include_router(agent_chat.router)
-app.include_router(files.router)
-app.include_router(chunks.router)
-app.include_router(chat.router)
 
 
 @app.get("/api/health")

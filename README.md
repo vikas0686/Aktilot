@@ -15,7 +15,7 @@
 
 Your team has documents everywhere — contracts, reports, runbooks, research papers — and finding answers means either manually digging through files or paying for a hosted AI service that ingests your sensitive data.
 
-Hosted document AI tools are expensive, opaque, and require you to hand over your files to a third party. On the other hand, building your own RAG pipeline from scratch means weeks of engineering work just to get a working prototype.
+Hosted document AI tools are expensive, opaque, and require you to hand over your files to a third party. Building your own RAG pipeline from scratch means weeks of engineering work just to get a working prototype.
 
 **Aktilot fills that gap.** It's a self-hosted, open-source platform that lets you upload your documents and ask questions in plain English — in minutes, not weeks, with your data staying exactly where it is.
 
@@ -27,6 +27,7 @@ Hosted document AI tools are expensive, opaque, and require you to hand over you
 - **Create AI agents per project** — each agent gets its own persona and instructions so it answers in the right tone and scope
 - **Ask questions, get cited answers** — every response shows exactly which document chunks it drew from, so you can verify the source
 - **See inside the pipeline** — keyword extraction, vector search, re-ranking, and context assembly are all surfaced in the UI with timings, so nothing is a black box
+- **Resilient document processing** — uploads are processed through a durable workflow engine; if embedding fails mid-way due to a rate limit or restart, only the failed step retries — no wasted API calls or lost work
 
 > Aktilot uses a hybrid BM25 + vector retrieval approach that consistently outperforms pure semantic search on precise factual questions.
 
@@ -55,15 +56,18 @@ docker compose up --build
 | Service | URL |
 |---|---|
 | App | http://localhost:3000 |
-| Backend | http://localhost:8000 |
+| Backend API | http://localhost:8000 |
+| Temporal UI | http://localhost:8233 |
 
 That's it. Create a project, upload a PDF, create an agent, and start asking questions.
+
+The Temporal UI at `:8233` lets you monitor document processing jobs, inspect individual pipeline steps, and retry failed uploads without re-uploading the file.
 
 ---
 
 ## Local Development
 
-If you want to contribute or run the services individually:
+**Prerequisites:** Python 3.12+, Node 20+, Docker (for Postgres + Temporal)
 
 **Backend**
 
@@ -74,14 +78,16 @@ pip install -r requirements.txt
 
 cp .env.example .env   # set OPENAI_API_KEY and DATABASE_URL
 
-# Start Postgres via Docker (skip if you have one running)
-docker run -d --name aktilot-db \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=docai \
-  -p 5432:5432 postgres:16-alpine
+# Start Postgres and Temporal via Docker
+docker compose up postgres temporal -d
 
 alembic upgrade head
+
+# Terminal 1 — API server
 uvicorn main:app --reload --port 8000
+
+# Terminal 2 — Temporal worker (processes document uploads)
+python -m temporal.worker
 ```
 
 **Frontend**
@@ -92,6 +98,17 @@ npm install
 npm run dev   # http://localhost:5173
 ```
 
+**Tests**
+
+```bash
+# Backend
+cd backend && source .venv/bin/activate
+pytest --tb=short -q
+
+# Frontend
+cd frontend && npm test
+```
+
 ---
 
 ## Environment Variables
@@ -100,12 +117,37 @@ npm run dev   # http://localhost:5173
 |---|---|---|
 | `OPENAI_API_KEY` | Yes | Your OpenAI API key |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (asyncpg) |
+| `TEMPORAL_ADDRESS` | No | Temporal server address (default: `localhost:7233`) |
 | `CHAT_MODEL` | No | Chat model to use (default: `gpt-4o-mini`) |
 | `EMBEDDING_MODEL` | No | Embedding model (default: `text-embedding-3-small`) |
 | `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
+
+---
+
+## How It Works
+
+```
+Upload                Temporal Cluster              Storage
+──────                ────────────────              ───────
+User uploads PDF ──▶ DocumentWorkflow
+                        │
+                        ├─ read & split file    ──▶ disk (uploads/)
+                        ├─ embed chunks         ──▶ OpenAI API   (retried independently)
+                        └─ index to vector DB   ──▶ ChromaDB
+
+Chat
+────
+User asks question ──▶ extract keywords    ──▶ OpenAI API
+                   ──▶ embed query         ──▶ OpenAI API
+                   ──▶ hybrid search       ──▶ ChromaDB (BM25 + vector)
+                   ──▶ generate answer     ──▶ OpenAI API
+                   ──▶ save messages       ──▶ PostgreSQL
+```
+
+Each step in the document pipeline is independently retryable. If OpenAI rate-limits the embedding step, only that step retries — the file is not re-read and the previous step's work is not repeated.
 
 ---
 

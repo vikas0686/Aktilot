@@ -2,21 +2,15 @@ import uuid
 from pathlib import Path
 
 import aiofiles
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    File,
-    HTTPException,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import project_upload_dir
 from db.session import get_db
 from models.schemas import FileResponse
-from services import project_file_service, project_chunk_service, project_service
+from services import project_file_service, project_service
+from temporal.client import get_temporal_client
+from temporal.workflows.document_workflow import TASK_QUEUE, DocumentWorkflow
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".doc", ".docx"}
 
@@ -30,7 +24,6 @@ router = APIRouter(prefix="/api/projects", tags=["project-files"])
 )
 async def upload_file(
     project_id: uuid.UUID,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -62,10 +55,12 @@ async def upload_file(
         file_id=file_id,
     )
 
-    background_tasks.add_task(
-        project_chunk_service.chunk_file,
-        str(record.id),
-        str(project_id),
+    tc = await get_temporal_client()
+    await tc.start_workflow(
+        DocumentWorkflow.run,
+        args=[str(record.id), str(project_id)],
+        id=f"doc-{record.id}",
+        task_queue=TASK_QUEUE,
     )
 
     return record

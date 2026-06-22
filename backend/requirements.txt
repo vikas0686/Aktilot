@@ -4,9 +4,7 @@ pydantic==2.13.4
 pydantic-settings==2.7.0
 openai==1.58.1
 pypdf==5.1.0
-faiss-cpu==1.14.2
 aiofiles==24.1.0
-numpy==2.2.0
 python-multipart==0.0.20
 python-docx==1.2.0
 # database
@@ -18,6 +16,8 @@ alembic>=1.13.0
 chromadb>=0.5.0
 # ranking
 rank-bm25>=0.2.2
+# temporal
+temporalio>=1.7
 # testing
 pytest>=8.0
 pytest-asyncio>=0.24
