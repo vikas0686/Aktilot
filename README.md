@@ -88,7 +88,7 @@ All three workflows run on a **Temporal Cluster** for durable, individually-retr
 The fastest way to run Aktilot is with Docker Compose. You need an [OpenAI API key](https://platform.openai.com/api-keys) and Docker installed.
 
 ```bash
-git clone https://github.com/your-org/aktilot.git
+git clone https://github.com/vikas0686/aktilot.git
 cd aktilot
 
 cp .env.example .env
@@ -177,7 +177,7 @@ We welcome contributions of all kinds — bug fixes, new features, documentation
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up your dev environment, our branching workflow, code standards, and how to submit a pull request.
 
-If you've found a bug, open an [issue](https://github.com/your-org/aktilot/issues). If you have a feature idea, start a [discussion](https://github.com/your-org/aktilot/discussions) before writing code.
+If you've found a bug, open an [issue](https://github.com/vikas0686/aktilot/issues). If you have a feature idea, start a [discussion](https://github.com/vikas0686/aktilot/discussions) before writing code.
 
 For security vulnerabilities, please do not open a public issue — see [SECURITY.md](SECURITY.md).
 
