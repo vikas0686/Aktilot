@@ -39,12 +39,15 @@ def update_embedding_dims(model: str, dims: int) -> None:
 
 def _observe_vectordb_sizes(options):
     for (project_id, coll_name), size in list(_vectordb_size_cache.items()):
-        yield Observation(size, {"rag.project_id": project_id, "rag.collection_name": coll_name})
+        yield Observation(
+            size, {"rag.project_id": project_id, "rag.collection_name": coll_name}
+        )
 
 
 def _observe_embedding_dims(options):
     for model, dims in list(_embedding_dim_cache.items()):
         yield Observation(dims, {"rag.model": model})
+
 
 # ── 6.1  Retrieval ────────────────────────────────────────────────────────────
 

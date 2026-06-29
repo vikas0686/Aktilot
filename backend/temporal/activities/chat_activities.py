@@ -138,9 +138,7 @@ async def extract_keywords(question: str) -> list[str]:
 
     # Retry signal
     if activity.info().attempt > 1:
-        m.workflow_retries_total.add(
-            1, {**attrs, "error_type": "RATE_LIMIT"}
-        )
+        m.workflow_retries_total.add(1, {**attrs, "error_type": "RATE_LIMIT"})
 
     raw = resp.choices[0].message.content or "[]"
     try:
