@@ -97,11 +97,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
-| Service | URL |
-|---|---|
-| App | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| Temporal UI | http://localhost:8233 |
+| Service | URL | Purpose |
+|---|---|---|
+| App | http://localhost:3000 | Main UI |
+| Backend API | http://localhost:8000 | REST API + OpenAPI docs at `/docs` |
+| Temporal UI | http://localhost:8233 | Workflow execution history and retries |
+| Grafana | http://localhost:3002 | Observability dashboards (admin / admin) |
+| Prometheus | http://localhost:9090 | Metrics query engine |
 
 That's it. Create a project, upload a PDF, create an agent, and start asking questions.
 
@@ -168,6 +170,14 @@ cd frontend && npm test
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
+
+---
+
+## Observability
+
+Aktilot ships with a full observability stack — metrics, traces, and 7 pre-built Grafana dashboards covering LLM performance, retrieval quality, token costs, prompt intelligence, vector database health, and Temporal workflow execution.
+
+See **[OBSERVABILITY.md](OBSERVABILITY.md)** for the full dashboard guide, metrics reference, and service URLs.
 
 ---
 
