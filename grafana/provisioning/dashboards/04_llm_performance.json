@@ -1,0 +1,73 @@
+{
+  "uid": "llm-performance",
+  "title": "LLM Performance",
+  "tags": ["aktilot", "llm", "latency"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Response Latency by Purpose (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 14, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Average LLM call latency. generate_answer drives user-perceived wait time; keyword_extract runs first.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_llm_request_latency_ms_sum{rag_llm_purpose=\"generate\"}) / clamp_min(sum(rag_llm_request_latency_ms_count{rag_llm_purpose=\"generate\"}), 1)",
+          "legendFormat": "generate_answer",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_llm_request_latency_ms_sum{rag_llm_purpose=\"keyword_extract\"}) / clamp_min(sum(rag_llm_request_latency_ms_count{rag_llm_purpose=\"keyword_extract\"}), 1)",
+          "legendFormat": "keyword_extract",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Finish Reason Distribution",
+      "type": "piechart",
+      "gridPos": { "x": 14, "y": 0, "w": 10, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "finish_reason=length means max_tokens was hit and the answer was cut off. Should be almost entirely 'stop'.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(finish_reason) (rag_llm_requests_total)",
+          "legendFormat": "{{finish_reason}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "LLM Requests by Purpose",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "keyword_extract should track 1:1 with generate. Any divergence means a chat workflow step is failing silently.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_llm_purpose) (rag_llm_requests_total)",
+          "legendFormat": "{{rag_llm_purpose}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

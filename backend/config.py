@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("uploads")
     chroma_dir: Path = Path("chroma_data")
     temporal_address: str = "localhost:7233"
+    # observability
+    otel_endpoint: str = "http://localhost:4317"
+    environment: str = "development"
+    app_version: str = "0.1.0"
 
     model_config = {"env_file": ".env"}
 

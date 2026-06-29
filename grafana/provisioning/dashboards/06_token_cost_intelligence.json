@@ -1,0 +1,83 @@
+{
+  "uid": "token-cost",
+  "title": "Token & Cost Intelligence",
+  "tags": ["aktilot", "tokens", "cost"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cumulative Input Tokens by Model",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Primary LLM cost driver. Steps up with each request. Model breakdown shows cost split if you run multiple models.",
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15 } } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_model) (rag_tokens_input_total)",
+          "legendFormat": "input ({{rag_model}})",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Cumulative Output Tokens by Purpose",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Output tokens cost more per token on most models. generate_answer should dominate; if keyword_extract is large your extraction prompt is too verbose.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_llm_purpose) (rag_tokens_output_total)",
+          "legendFormat": "output ({{rag_llm_purpose}})",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Cumulative Embedding Tokens (ingestion vs query)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Ingestion tokens spike on upload then flatten. Query embedding grows steadily with usage. Large ingestion spikes = bulk uploads.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_call_site) (rag_tokens_embedding_total)",
+          "legendFormat": "embedding ({{rag_call_site}})",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Input / Output Token Ratio",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Rising ratio = LLM generating longer answers relative to prompt size. Sustained rise may indicate prompt drift or model behaviour change.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_tokens_input_total) / clamp_min(sum(rag_tokens_output_total), 1)",
+          "legendFormat": "input / output ratio",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

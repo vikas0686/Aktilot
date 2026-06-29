@@ -1,0 +1,45 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      # Link Prometheus exemplars (embedded trace IDs) to the Tempo datasource
+      # so clicking a histogram bar jumps directly to the matching trace.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: true
+    jsonData:
+      httpMethod: GET
+      nodeGraph:
+        enabled: true
+      # Tempo → Prometheus: clicking a span opens the matching Prometheus metric
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: "-2m"
+        spanEndTimeShift: "2m"
+        tags:
+          - key: service.name
+            value: service
+          - key: rag.project_id
+          - key: rag.activity_name
+      # Service map built from span data
+      serviceMap:
+        datasourceUid: prometheus
+      # Search config
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: ""

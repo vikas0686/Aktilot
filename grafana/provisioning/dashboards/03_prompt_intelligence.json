@@ -1,0 +1,91 @@
+{
+  "uid": "prompt-intelligence",
+  "title": "Prompt Intelligence",
+  "tags": ["aktilot", "prompt", "tokens"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Prompt Token Composition (avg per query)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Where prompt tokens are going. Rising context = chunks too large or top_k too high. Rising system = prompt template bloat — that costs money on every single query.",
+      "fieldConfig": {
+        "defaults": { "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_prompt_tokens_context_sum) / clamp_min(sum(rag_prompt_tokens_context_count), 1)",
+          "legendFormat": "context (retrieved chunks)",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_prompt_tokens_system_sum) / clamp_min(sum(rag_prompt_tokens_system_count), 1)",
+          "legendFormat": "system prompt",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_prompt_tokens_user_question_sum) / clamp_min(sum(rag_prompt_tokens_user_question_count), 1)",
+          "legendFormat": "user question",
+          "refId": "C",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Context Tokens by Project (avg per query)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Rising trend per project = that project's chunks are getting larger or top_k increased.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_project_id) (rag_prompt_tokens_context_sum) / clamp_min(sum by(rag_project_id) (rag_prompt_tokens_context_count), 1)",
+          "legendFormat": "project {{rag_project_id}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Chunks Included vs Top-K Requested (avg)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Gap = context builder filtered chunks (token limit hit). If equal, top_k may be set higher than useful.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_prompt_chunks_included_sum) / clamp_min(sum(rag_prompt_chunks_included_count), 1)",
+          "legendFormat": "chunks included",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_top_k_requested_sum) / clamp_min(sum(rag_retrieval_top_k_requested_count), 1)",
+          "legendFormat": "top_k requested",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

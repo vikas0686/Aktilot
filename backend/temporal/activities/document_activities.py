@@ -14,6 +14,7 @@ Raising ApplicationError(non_retryable=True) signals Temporal to stop retrying.
 """
 
 import json
+import time
 import uuid
 from pathlib import Path
 
@@ -26,6 +27,7 @@ import db.models  # noqa: F401 — side-effect import: registers all SQLAlchemy 
 from config import settings
 from db.models.file import File
 from db.session import AsyncSessionFactory
+from observability import metrics as m
 from services.project_chunk_service import _embed, _read_file, _split_text
 from vectorstore.chroma_store import add_chunks
 from vectorstore.chroma_store import delete_file as chroma_delete_file
@@ -103,11 +105,43 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
     filename: str = data["filename"]
     chunks: list[str] = data["chunks"]
 
+    attrs = {
+        "rag.activity_name": "embed_and_index_chunks",
+        "rag.project_id": project_id,
+        "rag.collection_name": project_id,
+        "rag.model": settings.embedding_model,
+        "rag.embedding_model": settings.embedding_model,
+        "rag.provider": "openai",
+        "rag.call_site": "chunk_batch",
+    }
+    info = activity.info()
+    attrs["rag.workflow_id"] = info.workflow_id
+    attrs["rag.workflow_type"] = info.workflow_type
+
+    m.embedding_batch_size.record(len(chunks), attrs)
+
+    # ── Embed ──────────────────────────────────────────────────────────────────
+    t_embed = time.perf_counter()
     try:
-        embeddings = await _embed(chunks)
+        embeddings, usage_tokens = await _embed_with_usage(chunks)
     except AuthenticationError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
+        )
         raise ApplicationError(str(exc), non_retryable=True) from exc
 
+    embed_latency_ms = (time.perf_counter() - t_embed) * 1000
+    m.embedding_latency.record(embed_latency_ms, attrs)
+    m.embedding_requests_total.add(1, attrs)
+    m.requests_embedding_total.add(1, attrs)
+    if usage_tokens:
+        m.embedding_tokens_total.add(usage_tokens, attrs)
+        m.tokens_embedding_total.add(usage_tokens, attrs)
+
+    if activity.info().attempt > 1:
+        m.workflow_retries_total.add(1, {**attrs, "error_type": "UNKNOWN"})
+
+    # ── Index to ChromaDB ─────────────────────────────────────────────────────
     chunk_dicts = [
         {
             "id": str(uuid.uuid4()),
@@ -118,7 +152,56 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
         }
         for i, text in enumerate(chunks)
     ]
+
+    chroma_attrs = {
+        "rag.activity_name": "embed_and_index_chunks",
+        "rag.collection_name": project_id,
+        "rag.provider": "chroma",
+        "rag.project_id": project_id,
+    }
+
+    t_insert = time.perf_counter()
     add_chunks(project_id, chunk_dicts, embeddings)
+    insert_latency_ms = (time.perf_counter() - t_insert) * 1000
+
+    m.vectordb_insert_latency.record(insert_latency_ms, chroma_attrs)
+    m.vectordb_insert_count_total.add(1, chroma_attrs)
+
+    # ── Collection size (cheap metadata call, not a full scan) ────────────────
+    try:
+        from vectorstore.chroma_store import collection_count
+
+        count = collection_count(project_id)
+        m.update_vectordb_size(project_id, project_id, count)
+    except Exception:
+        pass  # collection size is best-effort; never fail the activity over it
 
     out.unlink(missing_ok=True)
     return len(chunks)
+
+
+_EMBED_BATCH = 100  # matches project_chunk_service.EMBED_BATCH
+
+
+async def _embed_with_usage(chunks: list[str]) -> tuple[list[list[float]], int]:
+    """
+    Embeds chunks in batches (same batch size as project_chunk_service)
+    and accumulates total token usage across all batches.
+    Returns (embeddings, total_tokens).
+    """
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    vectors: list[list[float]] = []
+    total_tokens = 0
+
+    for i in range(0, len(chunks), _EMBED_BATCH):
+        batch = chunks[i : i + _EMBED_BATCH]
+        resp = await client.embeddings.create(
+            model=settings.embedding_model, input=batch
+        )
+        vectors.extend(item.embedding for item in resp.data)
+        if resp.usage:
+            total_tokens += resp.usage.total_tokens
+
+    return vectors, total_tokens

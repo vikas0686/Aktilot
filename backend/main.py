@@ -2,9 +2,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from api.routes import agent_chat, agents, project_files, projects
+from db.session import engine
+from observability.otel import configure_otel
 from temporal.client import close_temporal_client, init_temporal_client
+
+# Bootstrap OTel before the app object is created so the FastAPI instrumentor
+# can attach to the already-configured tracer provider.
+configure_otel("aktilot-api")
+SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
 
 
 @asynccontextmanager
@@ -15,6 +24,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Document AI Assistant", lifespan=lifespan)
+
+FastAPIInstrumentor.instrument_app(app)
 
 app.add_middleware(
     CORSMiddleware,

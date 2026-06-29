@@ -1,0 +1,223 @@
+{
+  "uid": "temporal-workflows",
+  "title": "Temporal Workflows",
+  "tags": ["aktilot", "temporal", "workflows"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Activities Executed",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Cumulative activity executions since worker start. Each ChatWorkflow runs 7 activities.",
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(temporal_activity_task_received)",
+          "legendFormat": "activities",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Activity Retries",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total retry attempts (attempt > 1). Non-zero = a dependency was flaky (OpenAI, ChromaDB, Postgres).",
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 3 }, { "color": "red", "value": 10 }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_workflow_retries_total)",
+          "legendFormat": "retries",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Activity Failures",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Terminal activity failures after all retries exhausted. Each one failed a workflow.",
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": 0 }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_workflow_activity_failures_total)",
+          "legendFormat": "failures",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Worker Slots In Use",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Activity slots currently occupied. Near max = worker is saturated.",
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(temporal_worker_task_slots_used{worker_type=\"ActivityWorker\"})",
+          "legendFormat": "slots used",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Activity Execution Latency by Type (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 14, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Actual execution time per activity from the Temporal SDK. generate_answer dominates (LLM call). embed_query and extract_keywords are the next biggest. search_vectors and hybrid_rank should be fast.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(activity_type) (temporal_activity_execution_latency_sum) / clamp_min(sum by(activity_type) (temporal_activity_execution_latency_count), 1)",
+          "legendFormat": "{{activity_type}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Worker Task Slots — Available vs Used",
+      "type": "timeseries",
+      "gridPos": { "x": 14, "y": 4, "w": 10, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Available slots dropping to 0 = worker saturated, new activities queue up. Gap between lines = spare capacity.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "temporal_worker_task_slots_available{worker_type=\"ActivityWorker\"}",
+          "legendFormat": "slots available",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "temporal_worker_task_slots_used{worker_type=\"ActivityWorker\"}",
+          "legendFormat": "slots used",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Activity Queue Delay — Schedule to Start (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Time between Temporal scheduling an activity and the worker picking it up. Should be near zero. Rising = worker is overloaded or the worker process crashed and Temporal is waiting for reconnection.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(temporal_activity_schedule_to_start_latency_sum) / clamp_min(sum(temporal_activity_schedule_to_start_latency_count), 1)",
+          "legendFormat": "avg queue delay",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Retries by Activity",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Which activities are being retried. Sustained retries on generate_answer = OpenAI rate limiting or timeout. Retries on search_vectors = ChromaDB instability.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(rag_activity_name) (rag_workflow_retries_total)",
+          "legendFormat": "{{rag_activity_name}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Activity End-to-End Latency (schedule → complete) avg ms",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 14, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Total time from when Temporal schedules an activity to when it completes successfully. Includes queue wait + execution. Wider gap vs execution latency = queue buildup.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(activity_type) (temporal_activity_succeed_endtoend_latency_sum) / clamp_min(sum by(activity_type) (temporal_activity_succeed_endtoend_latency_count), 1)",
+          "legendFormat": "{{activity_type}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Workflow Cache (Sticky Execution)",
+      "type": "timeseries",
+      "gridPos": { "x": 14, "y": 20, "w": 10, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Sticky cache keeps workflow history in memory to avoid replaying from scratch. Cache hits = efficient. Cache size growing = many concurrent workflows in flight.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(temporal_sticky_cache_hit)",
+          "legendFormat": "cache hits",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "temporal_sticky_cache_size",
+          "legendFormat": "cache size",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

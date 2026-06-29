@@ -149,7 +149,7 @@ class ChatWorkflow:
         t = workflow.now()
         answer: str = await workflow.execute_activity(
             generate_answer,
-            args=[question, context, config["system_prompt"]],
+            args=[question, context, config["system_prompt"], len(ranked)],
             start_to_close_timeout=timedelta(seconds=60),
             retry_policy=_OPENAI_RETRY,
         )

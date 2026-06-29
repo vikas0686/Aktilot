@@ -1,0 +1,166 @@
+{
+  "uid": "retrieval-quality",
+  "title": "Retrieval Quality",
+  "tags": ["aktilot", "retrieval"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Reranker Score Over Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Top-1 score = best chunk found. Avg score = quality across all returned chunks. Both below 0.4 = retrieval not finding relevant content.",
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1,
+          "thresholds": { "steps": [{ "color": "red", "value": 0 }, { "color": "yellow", "value": 0.4 }, { "color": "green", "value": 0.6 }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_reranker_score_top1_sum) / clamp_min(sum(rag_reranker_score_top1_count), 1)",
+          "legendFormat": "top-1 score",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_reranker_score_avg_sum) / clamp_min(sum(rag_reranker_score_avg_count), 1)",
+          "legendFormat": "avg score",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Avg Docs Returned",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Low value = collection too sparse. Should be close to top_k requested.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_top_k_returned_sum) / clamp_min(sum(rag_retrieval_top_k_returned_count), 1)",
+          "legendFormat": "avg docs returned",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Reranker Discard Ratio",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Fraction of retrieved chunks discarded by reranker. ~0.7 is expected for k=20 → top_k=6.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_reranker_docs_discarded_sum) / clamp_min(sum(rag_reranker_docs_in_sum), 1)",
+          "legendFormat": "discard ratio",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Retrieval Score by Type (avg)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Score per search strategy. If hybrid < vector, BM25 is hurting the blend.",
+      "fieldConfig": { "defaults": { "min": 0, "max": 1 } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by(score_type) (rag_retrieval_score_avg_sum) / clamp_min(sum by(score_type) (rag_retrieval_score_avg_count), 1)",
+          "legendFormat": "{{score_type}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Top-K Requested vs Returned (avg)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Gap between lines = collection too sparse to satisfy the top_k request.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_top_k_requested_sum) / clamp_min(sum(rag_retrieval_top_k_requested_count), 1)",
+          "legendFormat": "requested",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_top_k_returned_sum) / clamp_min(sum(rag_retrieval_top_k_returned_count), 1)",
+          "legendFormat": "returned",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Retrieval Latency Breakdown (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Where retrieval time goes. ChromaDB + BM25 run in parallel; reranker runs after both complete.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_vectordb_search_latency_ms_sum) / clamp_min(sum(rag_vectordb_search_latency_ms_count), 1)",
+          "legendFormat": "ChromaDB",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_bm25_latency_ms_sum) / clamp_min(sum(rag_retrieval_bm25_latency_ms_count), 1)",
+          "legendFormat": "BM25",
+          "refId": "B",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_retrieval_hybrid_latency_ms_sum) / clamp_min(sum(rag_retrieval_hybrid_latency_ms_count), 1)",
+          "legendFormat": "hybrid total",
+          "refId": "C",
+          "range": true,
+          "instant": false
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_reranker_latency_ms_sum) / clamp_min(sum(rag_reranker_latency_ms_count), 1)",
+          "legendFormat": "reranker",
+          "refId": "D",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}

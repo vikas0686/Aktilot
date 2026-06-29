@@ -1,0 +1,84 @@
+{
+  "uid": "vectordb-health",
+  "title": "Vector Database Health",
+  "tags": ["aktilot", "chromadb", "vectordb"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Collection Size Over Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 16, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Vector count per collection. Sudden jumps = bulk ingestion. Flat line after upload = expected.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rag_vectordb_collection_size",
+          "legendFormat": "{{rag_collection_name}}",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Queries by Collection",
+      "type": "barchart",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 10 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Which collections are being queried most. Hot collections may need dedicated resources.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "topk(10, sum by(rag_collection_name) (rag_vectordb_query_count_total))",
+          "legendFormat": "{{rag_collection_name}}",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Search Latency (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 10, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "ChromaDB vector search latency. Persistent increase = index fragmentation or memory pressure.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_vectordb_search_latency_ms_sum) / clamp_min(sum(rag_vectordb_search_latency_ms_count), 1)",
+          "legendFormat": "avg search latency",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Insert Latency (avg ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 10, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "ChromaDB batch insert latency during document ingestion. Slow = disk I/O or memory pressure.",
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rag_vectordb_insert_latency_ms_sum) / clamp_min(sum(rag_vectordb_insert_latency_ms_count), 1)",
+          "legendFormat": "avg insert latency",
+          "refId": "A",
+          "range": true,
+          "instant": false
+        }
+      ]
+    }
+  ]
+}
