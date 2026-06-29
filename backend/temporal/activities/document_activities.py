@@ -28,7 +28,7 @@ from config import settings
 from db.models.file import File
 from db.session import AsyncSessionFactory
 from observability import metrics as m
-from services.project_chunk_service import _embed, _read_file, _split_text
+from services.project_chunk_service import _read_file, _split_text
 from vectorstore.chroma_store import add_chunks
 from vectorstore.chroma_store import delete_file as chroma_delete_file
 
