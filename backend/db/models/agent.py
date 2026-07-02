@@ -31,3 +31,6 @@ class Agent(Base):
     messages: Mapped[list["Message"]] = relationship(  # noqa: F821
         "Message", back_populates="agent", cascade="all, delete-orphan"
     )
+    chat_sessions: Mapped[list["ChatSession"]] = relationship(  # noqa: F821
+        "ChatSession", back_populates="agent", cascade="all, delete-orphan"
+    )

@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Project, ProjectFile, Agent, AgentChatMessage, FileRecord, ChatResponse, ChunkStats } from "@/types/api";
+import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats } from "@/types/api";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -37,10 +37,20 @@ export const agentsApi = {
 };
 
 export const agentChatApi = {
-  send: (agentId: string, question: string) =>
-    api.post<ChatResponse>(`/agents/${agentId}/chat`, { question }),
-  messages: (agentId: string) =>
-    api.get<AgentChatMessage[]>(`/agents/${agentId}/messages`),
+  send: (agentId: string, sessionId: string, question: string) =>
+    api.post<ChatResponse>(`/agents/${agentId}/chat`, {
+      question,
+      session_id: sessionId,
+    }),
+};
+
+export const chatSessionsApi = {
+  listByAgent: (agentId: string) =>
+    api.get<ChatSession[]>(`/agents/${agentId}/sessions`),
+  create: (agentId: string) =>
+    api.post<ChatSession>(`/agents/${agentId}/sessions`),
+  messages: (sessionId: string) =>
+    api.get<AgentChatMessage[]>(`/sessions/${sessionId}/messages`),
 };
 
 export const filesApi = {

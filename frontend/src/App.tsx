@@ -23,6 +23,10 @@ export default function App() {
               path="/projects/:projectId/agents/:agentId/chat"
               element={<AgentChatPage />}
             />
+            <Route
+              path="/projects/:projectId/agents/:agentId/chat/:sessionId"
+              element={<AgentChatPage />}
+            />
           </Routes>
         </AppShell>
       </BrowserRouter>

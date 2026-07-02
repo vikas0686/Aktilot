@@ -23,6 +23,7 @@ from db.base import Base  # noqa: E402
 import db.models.project  # noqa: E402, F401
 import db.models.file  # noqa: E402, F401
 import db.models.agent  # noqa: E402, F401
+import db.models.chat_session  # noqa: E402, F401
 import db.models.message  # noqa: E402, F401
 
 import pytest_asyncio  # noqa: E402

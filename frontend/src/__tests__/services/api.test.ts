@@ -26,6 +26,7 @@ vi.mock("axios", () => ({
 import {
   agentChatApi,
   agentsApi,
+  chatSessionsApi,
   projectFilesApi,
   projectsApi,
 } from "@/services/api";
@@ -125,15 +126,30 @@ describe("agentsApi", () => {
 // ── agentChatApi ──────────────────────────────────────────────────────────────
 
 describe("agentChatApi", () => {
-  it("send → POST /agents/:id/chat with question", () => {
-    agentChatApi.send("agent-1", "What is the total?");
+  it("send → POST /agents/:id/chat with question and session_id", () => {
+    agentChatApi.send("agent-1", "session-1", "What is the total?");
     expect(mockPost).toHaveBeenCalledWith("/agents/agent-1/chat", {
       question: "What is the total?",
+      session_id: "session-1",
     });
   });
+});
 
-  it("messages → GET /agents/:id/messages", () => {
-    agentChatApi.messages("agent-1");
-    expect(mockGet).toHaveBeenCalledWith("/agents/agent-1/messages");
+// ── chatSessionsApi ───────────────────────────────────────────────────────────
+
+describe("chatSessionsApi", () => {
+  it("listByAgent → GET /agents/:id/sessions", () => {
+    chatSessionsApi.listByAgent("agent-1");
+    expect(mockGet).toHaveBeenCalledWith("/agents/agent-1/sessions");
+  });
+
+  it("create → POST /agents/:id/sessions", () => {
+    chatSessionsApi.create("agent-1");
+    expect(mockPost).toHaveBeenCalledWith("/agents/agent-1/sessions");
+  });
+
+  it("messages → GET /sessions/:id/messages", () => {
+    chatSessionsApi.messages("session-1");
+    expect(mockGet).toHaveBeenCalledWith("/sessions/session-1/messages");
   });
 });

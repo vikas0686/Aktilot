@@ -33,6 +33,14 @@ export interface AgentChatMessage {
   created_at: string;
 }
 
+export interface ChatSession {
+  id: string;
+  agent_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FileRecord {
   id: string;
   filename: string;

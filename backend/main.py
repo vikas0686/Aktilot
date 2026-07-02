@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-from api.routes import agent_chat, agents, project_files, projects
+from api.routes import agent_chat, agents, chat_sessions, project_files, projects
 from db.session import engine
 from observability.otel import configure_otel
 from temporal.client import close_temporal_client, init_temporal_client
@@ -39,6 +39,7 @@ app.include_router(project_files.router)
 app.include_router(agents.project_router)
 app.include_router(agents.agent_router)
 app.include_router(agent_chat.router)
+app.include_router(chat_sessions.router)
 
 
 @app.get("/api/health")

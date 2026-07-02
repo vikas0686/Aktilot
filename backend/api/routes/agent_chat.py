@@ -14,7 +14,7 @@ from models.schemas import (
     RetrievedChunk,
     ToolStep,
 )
-from services import agent_service, message_service
+from services import agent_service, message_service, session_service
 from temporal.client import get_temporal_client
 from temporal.workflows.chat_workflow import TASK_QUEUE, ChatWorkflow
 
@@ -36,12 +36,15 @@ async def chat(
 ):
     # Pre-flight: verify agent exists before dispatching to Temporal
     await agent_service.get(db, agent_id)
+    session = await session_service.get(db, body.session_id)
+    if session.agent_id != agent_id:
+        raise HTTPException(404, "Chat session not found for this agent")
 
     tc = await get_temporal_client()
     try:
         result: dict = await tc.execute_workflow(
             ChatWorkflow.run,
-            args=[str(agent_id), body.question],
+            args=[str(agent_id), str(body.session_id), body.question],
             id=f"chat-{uuid.uuid4()}",
             task_queue=TASK_QUEUE,
             execution_timeout=timedelta(minutes=2),

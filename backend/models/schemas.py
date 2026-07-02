@@ -27,6 +27,7 @@ class RetrievedChunk(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    session_id: uuid.UUID
 
 
 class ChatResponse(BaseModel):
@@ -108,3 +109,16 @@ class AgentResponse(BaseModel):
     system_prompt: str
     top_k: int
     created_at: datetime
+
+
+# ── Chat Sessions ─────────────────────────────────────────────────────────────
+
+
+class ChatSessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    title: str | None
+    created_at: datetime
+    updated_at: datetime

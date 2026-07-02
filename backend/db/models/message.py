@@ -18,6 +18,11 @@ class Message(Base):
         sa.ForeignKey("agents.id", ondelete="CASCADE"),
         nullable=False,
     )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.UUID(as_uuid=True),
+        sa.ForeignKey("chat_sessions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     # user | assistant
     role: Mapped[str] = mapped_column(sa.String(20), nullable=False)
     content: Mapped[str] = mapped_column(sa.Text, nullable=False)
@@ -27,3 +32,6 @@ class Message(Base):
     )
 
     agent: Mapped["Agent"] = relationship("Agent", back_populates="messages")  # noqa: F821
+    session: Mapped["ChatSession | None"] = relationship(  # noqa: F821
+        "ChatSession", back_populates="messages"
+    )

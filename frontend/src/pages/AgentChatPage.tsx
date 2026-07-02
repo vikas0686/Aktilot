@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -10,9 +10,16 @@ import {
   Send,
   CheckCircle,
 } from "lucide-react";
-import { useAgent, useAgentMessages, useSendAgentMessage } from "@/hooks/useApi";
+import {
+  useAgent,
+  useAgentSessions,
+  useCreateChatSession,
+  useSessionMessages,
+  useSendAgentMessage,
+} from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { ChatSessionsPanel } from "@/components/ChatSessionsPanel";
 import { cn } from "@/lib/utils";
 import type { ChatResponse, RetrievedChunk, ToolStep } from "@/types/api";
 
@@ -253,25 +260,58 @@ function AssistantBubble({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function AgentChatPage() {
-  const { agentId } = useParams<{ projectId: string; agentId: string }>();
+  const { projectId, agentId, sessionId } = useParams<{
+    projectId: string;
+    agentId: string;
+    sessionId?: string;
+  }>();
+  const navigate = useNavigate();
 
   const { data: agent } = useAgent(agentId!);
-  const { data: history, isLoading: historyLoading } = useAgentMessages(agentId!);
-  const send = useSendAgentMessage(agentId!);
+  const { data: sessions, isLoading: sessionsLoading } = useAgentSessions(agentId!);
+  const createSession = useCreateChatSession(agentId!);
+  const { data: history, isLoading: historyLoading } = useSessionMessages(sessionId);
+  const send = useSendAgentMessage(agentId!, sessionId);
 
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const historyLoaded = useRef(false);
+  const resolvingSession = useRef(false);
 
-  // Reset everything when switching to a different agent
+  // No session in the URL: land on the most recently updated one, or create
+  // a fresh one if this agent has no chats yet.
+  useEffect(() => {
+    if (sessionId || sessionsLoading || !sessions || resolvingSession.current) return;
+
+    if (sessions.length > 0) {
+      navigate(`/projects/${projectId}/agents/${agentId}/chat/${sessions[0].id}`, {
+        replace: true,
+      });
+    } else {
+      resolvingSession.current = true;
+      createSession.mutate(undefined, {
+        onSuccess: (session) => {
+          navigate(
+            `/projects/${projectId}/agents/${agentId}/chat/${session.id}`,
+            { replace: true }
+          );
+        },
+        onSettled: () => {
+          resolvingSession.current = false;
+        },
+      });
+    }
+  }, [sessionId, sessionsLoading, sessions, projectId, agentId, navigate, createSession]);
+
+  // Reset everything when switching to a different session
   useEffect(() => {
     historyLoaded.current = false;
     setLocalMessages([]);
     setInput("");
-  }, [agentId]);
+  }, [agentId, sessionId]);
 
-  // Seed from DB history once per agent
+  // Seed from DB history once per session
   useEffect(() => {
     if (history && !historyLoaded.current) {
       historyLoaded.current = true;
@@ -288,7 +328,7 @@ export function AgentChatPage() {
 
   const handleSend = () => {
     const q = input.trim();
-    if (!q || send.isPending) return;
+    if (!q || send.isPending || !sessionId) return;
     setInput("");
     setLocalMessages((prev) => [...prev, { role: "user", content: q }]);
 
@@ -311,110 +351,122 @@ export function AgentChatPage() {
     });
   };
 
-  const isEmpty =
-    !historyLoading && localMessages.length === 0 && !send.isPending;
+  const isResolvingSession = !sessionId;
+  const isLoading = isResolvingSession || historyLoading;
+  const isEmpty = !isLoading && localMessages.length === 0 && !send.isPending;
 
   return (
-    <>
-      {/* Scrollable thread */}
-      <div className="mx-auto max-w-3xl px-4 pb-36 pt-6">
-        {/* Agent header */}
-        <div className="mb-8 flex items-center gap-3 border-b border-border pb-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
-            <Bot className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-semibold leading-tight">
-              {agent?.name ?? "Loading…"}
-            </h1>
-            {agent?.description && (
-              <p className="text-sm text-muted-foreground">{agent.description}</p>
+    <div className="flex h-full overflow-hidden">
+      {/* Chat thread */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-3xl px-4 pb-8 pt-6">
+            {/* Agent header */}
+            <div className="mb-8 flex items-center gap-3 border-b border-border pb-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                <Bot className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="font-semibold leading-tight">
+                  {agent?.name ?? "Loading…"}
+                </h1>
+                {agent?.description && (
+                  <p className="text-sm text-muted-foreground">{agent.description}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Messages */}
+            {isLoading ? (
+              <div className="flex justify-center py-16">
+                <Spinner className="h-5 w-5" />
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {isEmpty && (
+                  <div className="flex flex-col items-center justify-center gap-3 py-20 text-center text-muted-foreground">
+                    <Bot className="h-12 w-12 opacity-20" />
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {agent?.name ?? "Agent"} is ready
+                      </p>
+                      <p className="mt-1 text-sm">
+                        Ask anything about the project's documents.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {localMessages.map((m, i) =>
+                  m.role === "user" ? (
+                    <UserBubble key={i} content={m.content} />
+                  ) : (
+                    <AssistantBubble
+                      key={i}
+                      content={m.content}
+                      response={m.response}
+                    />
+                  )
+                )}
+
+                {send.isPending && (
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm text-muted-foreground">
+                      <Spinner className="h-4 w-4" />
+                      Thinking…
+                    </div>
+                  </div>
+                )}
+
+                <div ref={bottomRef} />
+              </div>
             )}
           </div>
         </div>
 
-        {/* Messages */}
-        {historyLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5" />
+        {/* Input bar */}
+        <div className="border-t border-border px-4 py-4">
+          <div className="mx-auto flex max-w-3xl gap-3">
+            <input
+              className={cn(
+                "flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm",
+                "placeholder:text-muted-foreground",
+                "focus:outline-none focus:ring-2 focus:ring-primary",
+                "disabled:cursor-not-allowed disabled:opacity-50"
+              )}
+              placeholder={`Message ${agent?.name ?? "agent"}…`}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              disabled={send.isPending || isLoading}
+              autoFocus
+            />
+            <Button
+              onClick={handleSend}
+              disabled={send.isPending || !input.trim() || isLoading}
+              size="icon"
+              className="h-11 w-11 rounded-xl shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
           </div>
-        ) : (
-          <div className="space-y-8">
-            {isEmpty && (
-              <div className="flex flex-col items-center justify-center gap-3 py-20 text-center text-muted-foreground">
-                <Bot className="h-12 w-12 opacity-20" />
-                <div>
-                  <p className="font-medium text-foreground">
-                    {agent?.name ?? "Agent"} is ready
-                  </p>
-                  <p className="mt-1 text-sm">
-                    Ask anything about the project's documents.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {localMessages.map((m, i) =>
-              m.role === "user" ? (
-                <UserBubble key={i} content={m.content} />
-              ) : (
-                <AssistantBubble
-                  key={i}
-                  content={m.content}
-                  response={m.response}
-                />
-              )
-            )}
-
-            {send.isPending && (
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Bot className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm text-muted-foreground">
-                  <Spinner className="h-4 w-4" />
-                  Thinking…
-                </div>
-              </div>
-            )}
-
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Sticky input bar */}
-      <div className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-4 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl gap-3">
-          <input
-            className={cn(
-              "flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm",
-              "placeholder:text-muted-foreground",
-              "focus:outline-none focus:ring-2 focus:ring-primary",
-              "disabled:cursor-not-allowed disabled:opacity-50"
-            )}
-            placeholder={`Message ${agent?.name ?? "agent"}…`}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            disabled={send.isPending || historyLoading}
-            autoFocus
-          />
-          <Button
-            onClick={handleSend}
-            disabled={send.isPending || !input.trim() || historyLoading}
-            size="icon"
-            className="h-11 w-11 rounded-xl shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
         </div>
       </div>
-    </>
+
+      {/* Chat history panel */}
+      <ChatSessionsPanel
+        projectId={projectId!}
+        agentId={agentId!}
+        activeSessionId={sessionId}
+      />
+    </div>
   );
 }

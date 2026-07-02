@@ -11,8 +11,11 @@ async def create(
     agent_id: uuid.UUID,
     role: str,
     content: str,
+    session_id: uuid.UUID | None = None,
 ) -> Message:
-    message = Message(agent_id=agent_id, role=role, content=content)
+    message = Message(
+        agent_id=agent_id, session_id=session_id, role=role, content=content
+    )
     db.add(message)
     await db.commit()
     await db.refresh(message)
@@ -23,6 +26,15 @@ async def list_for_agent(db: AsyncSession, agent_id: uuid.UUID) -> list[Message]
     result = await db.execute(
         select(Message)
         .where(Message.agent_id == agent_id)
+        .order_by(Message.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_for_session(db: AsyncSession, session_id: uuid.UUID) -> list[Message]:
+    result = await db.execute(
+        select(Message)
+        .where(Message.session_id == session_id)
         .order_by(Message.created_at.asc())
     )
     return list(result.scalars().all())

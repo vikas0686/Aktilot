@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { projectsApi, projectFilesApi, agentsApi, agentChatApi, filesApi, chunksApi, chatApi } from "@/services/api";
+import { projectsApi, projectFilesApi, agentsApi, agentChatApi, chatSessionsApi, filesApi, chunksApi, chatApi } from "@/services/api";
 import type { ProjectFile } from "@/types/api";
 
 // ── Projects ──────────────────────────────────────────────────────────────────
@@ -124,20 +124,47 @@ export function useAgent(agentId: string) {
   });
 }
 
-const agentMessagesKey = (agentId: string) => ["agent-messages", agentId] as const;
+// ── Chat Sessions ─────────────────────────────────────────────────────────────
 
-export function useAgentMessages(agentId: string) {
+const agentSessionsKey = (agentId: string) => ["agent-sessions", agentId] as const;
+
+export function useAgentSessions(agentId: string) {
   return useQuery({
-    queryKey: agentMessagesKey(agentId),
-    queryFn: () => agentChatApi.messages(agentId).then((r) => r.data),
+    queryKey: agentSessionsKey(agentId),
+    queryFn: () => chatSessionsApi.listByAgent(agentId).then((r) => r.data),
     enabled: !!agentId,
   });
 }
 
-export function useSendAgentMessage(agentId: string) {
+export function useCreateChatSession(agentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => chatSessionsApi.create(agentId).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentSessionsKey(agentId) }),
+  });
+}
+
+const sessionMessagesKey = (sessionId: string) => ["session-messages", sessionId] as const;
+
+export function useSessionMessages(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: sessionMessagesKey(sessionId ?? ""),
+    queryFn: () => chatSessionsApi.messages(sessionId!).then((r) => r.data),
+    enabled: !!sessionId,
+  });
+}
+
+export function useSendAgentMessage(agentId: string, sessionId: string | undefined) {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (question: string) =>
-      agentChatApi.send(agentId, question).then((r) => r.data),
+      agentChatApi.send(agentId, sessionId!, question).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: agentSessionsKey(agentId) });
+      if (sessionId) {
+        qc.invalidateQueries({ queryKey: sessionMessagesKey(sessionId) });
+      }
+    },
   });
 }
 

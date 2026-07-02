@@ -64,7 +64,7 @@ def _make_step(name: str, t_start, inp: str, out: str) -> dict:
 @workflow.defn
 class ChatWorkflow:
     @workflow.run
-    async def run(self, agent_id: str, question: str) -> dict:
+    async def run(self, agent_id: str, session_id: str, question: str) -> dict:
         config: dict = await workflow.execute_activity(
             get_agent_config,
             args=[agent_id],
@@ -158,7 +158,7 @@ class ChatWorkflow:
         # Step 6: Persist messages — runs only after a successful answer
         await workflow.execute_activity(
             persist_messages,
-            args=[agent_id, question, answer],
+            args=[agent_id, session_id, question, answer],
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=_INFRA_RETRY,
         )

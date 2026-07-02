@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
@@ -74,9 +76,16 @@ def test_agent_update_partial():
 
 def test_chat_request_requires_question():
     with pytest.raises(ValidationError):
-        ChatRequest()  # type: ignore[call-arg]
+        ChatRequest(session_id=uuid.uuid4())  # type: ignore[call-arg]
+
+
+def test_chat_request_requires_session_id():
+    with pytest.raises(ValidationError):
+        ChatRequest(question="What is the invoice total?")  # type: ignore[call-arg]
 
 
 def test_chat_request_stores_question():
-    r = ChatRequest(question="What is the invoice total?")
+    sid = uuid.uuid4()
+    r = ChatRequest(question="What is the invoice total?", session_id=sid)
     assert r.question == "What is the invoice total?"
+    assert r.session_id == sid

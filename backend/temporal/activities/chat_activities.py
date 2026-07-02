@@ -26,6 +26,7 @@ from config import settings
 from db.models.agent import Agent
 from db.session import AsyncSessionFactory
 from observability import metrics as m
+from services import session_service
 from services.message_service import create as create_message
 from vectorstore.chroma_store import search as chroma_search
 
@@ -415,7 +416,13 @@ async def generate_answer(
 
 
 @activity.defn
-async def persist_messages(agent_id: str, question: str, answer: str) -> None:
+async def persist_messages(
+    agent_id: str, session_id: str, question: str, answer: str
+) -> None:
     async with AsyncSessionFactory() as db:
-        await create_message(db, uuid.UUID(agent_id), "user", question)
-        await create_message(db, uuid.UUID(agent_id), "assistant", answer)
+        sid = uuid.UUID(session_id)
+        await create_message(db, uuid.UUID(agent_id), "user", question, session_id=sid)
+        await create_message(
+            db, uuid.UUID(agent_id), "assistant", answer, session_id=sid
+        )
+        await session_service.touch_with_title(db, sid, question)

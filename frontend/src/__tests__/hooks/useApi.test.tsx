@@ -25,6 +25,10 @@ vi.mock("@/services/api", () => ({
   },
   agentChatApi: {
     send: vi.fn(),
+  },
+  chatSessionsApi: {
+    listByAgent: vi.fn(),
+    create: vi.fn(),
     messages: vi.fn(),
   },
   filesApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn() },
@@ -32,11 +36,12 @@ vi.mock("@/services/api", () => ({
   chatApi: { send: vi.fn() },
 }));
 
-import { agentChatApi, agentsApi, projectFilesApi, projectsApi } from "@/services/api";
+import { agentChatApi, agentsApi, chatSessionsApi, projectFilesApi, projectsApi } from "@/services/api";
 import {
   useAgent,
-  useAgentMessages,
+  useAgentSessions,
   useCreateAgent,
+  useCreateChatSession,
   useCreateProject,
   useDeleteAgent,
   useDeleteProject,
@@ -45,6 +50,7 @@ import {
   useProjectAgents,
   useProjectFiles,
   useProjects,
+  useSessionMessages,
   useSendAgentMessage,
   useUpdateAgent,
   useUploadProjectFile,
@@ -484,26 +490,67 @@ describe("useDeleteAgent", () => {
   });
 });
 
-// ── useAgentMessages ──────────────────────────────────────────────────────────
+// ── useAgentSessions ──────────────────────────────────────────────────────────
 
-describe("useAgentMessages", () => {
-  it("fetches messages for an agent", async () => {
+describe("useAgentSessions", () => {
+  it("fetches chat sessions for an agent", async () => {
+    const sessions = [
+      { id: "s1", agent_id: "a1", title: "Hello", created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" },
+    ];
+    vi.mocked(chatSessionsApi.listByAgent).mockResolvedValue({ data: sessions } as any);
+
+    const { result } = renderHook(() => useAgentSessions("a1"), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(sessions);
+    expect(chatSessionsApi.listByAgent).toHaveBeenCalledWith("a1");
+  });
+
+  it("does not fetch when agentId is empty", async () => {
+    const { result } = renderHook(() => useAgentSessions(""), { wrapper: makeWrapper() });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(chatSessionsApi.listByAgent).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe("idle");
+  });
+});
+
+// ── useCreateChatSession ──────────────────────────────────────────────────────
+
+describe("useCreateChatSession", () => {
+  it("creates a session for the agent", async () => {
+    const session = { id: "s1", agent_id: "a1", title: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" };
+    vi.mocked(chatSessionsApi.create).mockResolvedValue({ data: session } as any);
+
+    const { result } = renderHook(() => useCreateChatSession("a1"), { wrapper: makeWrapper() });
+    let returned: any;
+    await act(async () => {
+      returned = await result.current.mutateAsync();
+    });
+
+    expect(chatSessionsApi.create).toHaveBeenCalledWith("a1");
+    expect(returned).toEqual(session);
+  });
+});
+
+// ── useSessionMessages ────────────────────────────────────────────────────────
+
+describe("useSessionMessages", () => {
+  it("fetches messages for a session", async () => {
     const messages = [
       { id: "m1", agent_id: "a1", role: "user", content: "Hello", created_at: "2024-01-01T00:00:00Z" },
       { id: "m2", agent_id: "a1", role: "assistant", content: "Hi!", created_at: "2024-01-01T00:00:01Z" },
     ];
-    vi.mocked(agentChatApi.messages).mockResolvedValue({ data: messages } as any);
+    vi.mocked(chatSessionsApi.messages).mockResolvedValue({ data: messages } as any);
 
-    const { result } = renderHook(() => useAgentMessages("a1"), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => useSessionMessages("s1"), { wrapper: makeWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(messages);
-    expect(agentChatApi.messages).toHaveBeenCalledWith("a1");
+    expect(chatSessionsApi.messages).toHaveBeenCalledWith("s1");
   });
 
-  it("does not fetch when agentId is empty", async () => {
-    const { result } = renderHook(() => useAgentMessages(""), { wrapper: makeWrapper() });
+  it("does not fetch when sessionId is undefined", async () => {
+    const { result } = renderHook(() => useSessionMessages(undefined), { wrapper: makeWrapper() });
     await new Promise((r) => setTimeout(r, 50));
-    expect(agentChatApi.messages).not.toHaveBeenCalled();
+    expect(chatSessionsApi.messages).not.toHaveBeenCalled();
     expect(result.current.fetchStatus).toBe("idle");
   });
 });
@@ -511,29 +558,53 @@ describe("useAgentMessages", () => {
 // ── useSendAgentMessage ───────────────────────────────────────────────────────
 
 describe("useSendAgentMessage", () => {
-  it("calls send with agentId and question", async () => {
+  it("calls send with agentId, sessionId and question", async () => {
     const response = { answer: "42", tool_steps: [], retrieved_chunks: [], keywords: [] };
     vi.mocked(agentChatApi.send).mockResolvedValue({ data: response } as any);
 
-    const { result } = renderHook(() => useSendAgentMessage("a1"), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => useSendAgentMessage("a1", "s1"), { wrapper: makeWrapper() });
     let returned: any;
     await act(async () => {
       returned = await result.current.mutateAsync("What is the total?");
     });
 
-    expect(agentChatApi.send).toHaveBeenCalledWith("a1", "What is the total?");
+    expect(agentChatApi.send).toHaveBeenCalledWith("a1", "s1", "What is the total?");
     expect(returned).toEqual(response);
   });
 
   it("surfaces errors from send", async () => {
     vi.mocked(agentChatApi.send).mockRejectedValue(new Error("Server error"));
 
-    const { result } = renderHook(() => useSendAgentMessage("a1"), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => useSendAgentMessage("a1", "s1"), { wrapper: makeWrapper() });
 
     // Use mutate (fire-and-forget) + waitFor so React Query's async state update
     // is fully settled before we assert.
     act(() => { result.current.mutate("?"); });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(Error);
+  });
+
+  it("invalidates the session's cached messages after sending — otherwise switching away and back re-seeds stale (pre-send) history", async () => {
+    const { wrapper } = makeSharedWrapper();
+    const before = [{ id: "m1", agent_id: "a1", role: "user", content: "old", created_at: "2024-01-01T00:00:00Z" }];
+    const after = [
+      ...before,
+      { id: "m2", agent_id: "a1", role: "user", content: "What is the total?", created_at: "2024-01-01T00:00:01Z" },
+    ];
+    vi.mocked(chatSessionsApi.messages)
+      .mockResolvedValueOnce({ data: before } as any)
+      .mockResolvedValueOnce({ data: after } as any);
+    const response = { answer: "42", tool_steps: [], retrieved_chunks: [], keywords: [] };
+    vi.mocked(agentChatApi.send).mockResolvedValue({ data: response } as any);
+
+    const { result: messagesResult } = renderHook(() => useSessionMessages("s1"), { wrapper });
+    await waitFor(() => expect(messagesResult.current.data).toEqual(before));
+
+    const { result: sendResult } = renderHook(() => useSendAgentMessage("a1", "s1"), { wrapper });
+    await act(async () => {
+      await sendResult.current.mutateAsync("What is the total?");
+    });
+
+    await waitFor(() => expect(messagesResult.current.data).toEqual(after));
   });
 });
