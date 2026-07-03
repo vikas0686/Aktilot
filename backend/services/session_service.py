@@ -28,9 +28,7 @@ async def list_for_agent(db: AsyncSession, agent_id: uuid.UUID) -> list[ChatSess
 
 
 async def get(db: AsyncSession, session_id: uuid.UUID) -> ChatSession:
-    result = await db.execute(
-        select(ChatSession).where(ChatSession.id == session_id)
-    )
+    result = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
     session = result.scalar_one_or_none()
     if session is None:
         raise HTTPException(status_code=404, detail="Chat session not found")
@@ -44,9 +42,7 @@ async def touch_with_title(
     if session.title is None:
         title = question.strip()
         session.title = (
-            title[:_TITLE_MAX_LEN] + "…"
-            if len(title) > _TITLE_MAX_LEN
-            else title
+            title[:_TITLE_MAX_LEN] + "…" if len(title) > _TITLE_MAX_LEN else title
         )
     session.updated_at = datetime.now(timezone.utc)
     await db.commit()

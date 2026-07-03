@@ -243,9 +243,7 @@ async def test_list_sessions_orders_most_recently_updated_first(client, db_sessi
 
 
 async def test_session_messages_unknown_session_returns_404(client):
-    r = await client.get(
-        "/api/sessions/00000000-0000-0000-0000-000000000000/messages"
-    )
+    r = await client.get("/api/sessions/00000000-0000-0000-0000-000000000000/messages")
     assert r.status_code == 404
 
 
@@ -261,7 +259,11 @@ async def test_session_messages_populated_after_chat(client, db_session):
         db_session, agent_uuid, "user", "What is 42?", session_id=session_uuid
     )
     await message_service.create(
-        db_session, agent_uuid, "assistant", "The answer is 42.", session_id=session_uuid
+        db_session,
+        agent_uuid,
+        "assistant",
+        "The answer is 42.",
+        session_id=session_uuid,
     )
     await session_service.touch_with_title(db_session, session_uuid, "What is 42?")
 
