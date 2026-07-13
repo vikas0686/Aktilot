@@ -60,24 +60,29 @@ All three workflows run on a **Temporal Cluster** for durable, individually-retr
 
 ---
 
+## Demo
+
+A 35-second, end-to-end walkthrough — create a project, upload a document, spin up an agent, and ask it a question with real hybrid-retrieval sources and Temporal workflow timing.
+
+<video src="docs/demo.mp4" controls muted width="800">
+  Your browser can't play this video inline — <a href="docs/demo.mp4">download it here</a>.
+</video>
+
+---
+
 ## Screenshots
 
 <table>
   <tr>
-    <td><img src="docs/01.png" width="500"/></td>
-    <td><img src="docs/02.png" width="500"/></td>
+    <td><img src="docs/screenshot-projects.png" width="500"/><br/><sub>Projects</sub></td>
+    <td><img src="docs/screenshot-knowledge-base.png" width="500"/><br/><sub>Knowledge Base</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/03.png" width="500"/></td>
-    <td><img src="docs/04.png" width="500"/></td>
+    <td><img src="docs/screenshot-agents.png" width="500"/><br/><sub>Agents</sub></td>
+    <td><img src="docs/screenshot-chat.png" width="500"/><br/><sub>Chat — sources & workflow trace</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/05.png" width="500"/></td>
-    <td><img src="docs/06.png" width="500"/></td>
-  </tr>
-  <tr>
-    <td><img src="docs/07.png" width="500"/></td>
-    <td><img src="docs/08.png" width="500"/></td>
+    <td colspan="2"><img src="docs/screenshot-chat-dark.png" width="500"/><br/><sub>Chat — dark mode</sub></td>
   </tr>
 </table>
 
