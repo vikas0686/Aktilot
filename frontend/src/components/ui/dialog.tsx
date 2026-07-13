@@ -51,9 +51,15 @@ export function DialogHeader({ children }: { children: React.ReactNode }) {
   return <div className="mb-5">{children}</div>;
 }
 
-export function DialogTitle({ children }: { children: React.ReactNode }) {
+export function DialogTitle({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <DialogPrimitive.Title className="text-lg font-semibold leading-none">
+    <DialogPrimitive.Title className={cn("text-lg font-semibold leading-none", className)}>
       {children}
     </DialogPrimitive.Title>
   );

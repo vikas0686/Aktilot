@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2, Trash2 } from "lucide-react";
 import { useProject, useDeleteProject } from "@/hooks/useApi";
 import { FilesTab } from "@/components/FilesTab";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function ProjectDetailPage() {
@@ -25,8 +25,10 @@ export function ProjectDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-20">
-        <Spinner className="h-6 w-6" />
+      <div className="mx-auto max-w-5xl px-6 py-6 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-24 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
   }
@@ -46,15 +48,15 @@ export function ProjectDetailPage() {
     <div className="mx-auto max-w-5xl px-6 py-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{project.name}</h1>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+            Knowledge Base
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
           {project.description && (
             <p className="mt-0.5 text-sm text-muted-foreground">
               {project.description}
             </p>
           )}
-          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Knowledge Base
-          </p>
         </div>
 
         {/* Delete project */}
@@ -64,7 +66,7 @@ export function ProjectDetailPage() {
           disabled={del.isPending}
           title={confirming ? "Click again to confirm delete" : "Delete project"}
           className={cn(
-            "mt-1 shrink-0 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+            "mt-1 shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
             confirming
               ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
               : "text-muted-foreground hover:text-destructive"

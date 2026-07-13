@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Loader2, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Clock, Loader2, MessageSquare, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
   useProjectAgents,
   useCreateAgent,
   useUpdateAgent,
   useDeleteAgent,
+  useAgentSessions,
 } from "@/hooks/useApi";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CHAT_MODEL } from "@/lib/constants";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Agent } from "@/types/api";
 
 // ── Create / Edit modal ───────────────────────────────────────────────────────
@@ -54,13 +58,16 @@ function AgentFormModal({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Agent" : "New Agent"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            {isEdit ? "Edit Agent" : "New Agent"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Name *</label>
             <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="Support Bot"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -71,7 +78,7 @@ function AgentFormModal({
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Description</label>
             <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="What does this agent do?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -84,7 +91,7 @@ function AgentFormModal({
               Instructions sent to the LLM on every chat request for this agent.
             </p>
             <textarea
-              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="You are a helpful assistant. Answer questions based only on the provided context. If the answer is not in the context, say so clearly."
               rows={6}
               value={systemPrompt}
@@ -101,7 +108,7 @@ function AgentFormModal({
               type="number"
               min={1}
               max={10}
-              className="w-24 rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               value={topK}
               onChange={(e) => setTopK(Math.max(1, Math.min(10, Number(e.target.value))))}
             />
@@ -138,9 +145,14 @@ function AgentCard({
 }) {
   const navigate = useNavigate();
   const del = useDeleteAgent(projectId);
+  const { data: sessions, isLoading: sessionsLoading } = useAgentSessions(agent.id);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const isDeleting = del.isPending && del.variables === agent.id;
+
+  const lastUsedIso = sessions
+    ?.map((s) => s.updated_at)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
 
   const handleDelete = () => {
     if (confirming) {
@@ -152,18 +164,20 @@ function AgentCard({
 
   return (
     <>
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/40">
+      <div className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Bot className="h-4 w-4 shrink-0 text-primary" />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-accent/15">
+              <Bot className="h-4 w-4 text-primary" />
+            </div>
             <span className="truncate text-sm font-medium">{agent.name}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               onClick={() => setEditing(true)}
               title="Edit agent"
-              className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -173,9 +187,9 @@ function AgentCard({
               disabled={isDeleting}
               title={confirming ? "Click again to confirm" : "Delete agent"}
               className={cn(
-                "rounded px-1.5 py-1 text-xs font-medium transition-colors",
+                "rounded-md px-1.5 py-1 text-xs font-medium transition-colors",
                 confirming
-                  ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                  ? "bg-destructive/10 text-destructive hover:bg-destructive/20 opacity-100"
                   : "text-muted-foreground hover:text-destructive"
               )}
             >
@@ -199,21 +213,43 @@ function AgentCard({
 
         {/* System prompt preview */}
         {agent.system_prompt && (
-          <div className="rounded-md bg-muted/50 px-3 py-2">
+          <div className="rounded-lg bg-muted/50 px-3 py-2">
             <p className="line-clamp-2 font-mono text-xs text-muted-foreground">
               {agent.system_prompt}
             </p>
           </div>
         )}
 
-        {/* top_k badge */}
-        <p className="text-xs text-muted-foreground">
-          Sends top <strong className="text-foreground">{agent.top_k}</strong> chunk{agent.top_k !== 1 ? "s" : ""} to LLM
-        </p>
+        {/* Meta badges */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary">{CHAT_MODEL}</Badge>
+          <Badge variant="secondary">Top K {agent.top_k}</Badge>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" />
+            {sessionsLoading ? (
+              <Skeleton className="h-3 w-4" />
+            ) : (
+              <span className="font-medium text-foreground">{sessions?.length ?? 0}</span>
+            )}
+            chats
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            {sessionsLoading ? (
+              <Skeleton className="h-3 w-12" />
+            ) : (
+              lastUsedIso ? formatRelativeTime(lastUsedIso) : "Never used"
+            )}
+          </span>
+        </div>
 
         <Button
           size="sm"
-          className="mt-auto w-full"
+          className="mt-1 w-full"
           onClick={() =>
             navigate(`/projects/${projectId}/agents/${agent.id}/chat`)
           }
@@ -255,18 +291,23 @@ export function AgentsTab({ projectId }: { projectId: string }) {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-10">
-          <Spinner className="h-5 w-5" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[...Array(2)].map((_, i) => (
+            <Skeleton key={i} className="h-[220px] rounded-xl" />
+          ))}
         </div>
       ) : agents?.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
-          <Bot className="h-10 w-10 opacity-30" />
-          <p className="text-sm">No agents yet.</p>
-          <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            Create your first agent
-          </Button>
-        </div>
+        <EmptyState
+          icon={Bot}
+          title="No agents yet"
+          description="Create an agent to start chatting with this project's documents."
+          action={
+            <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" />
+              Create your first agent
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {agents?.map((a) => (

@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Loader2, Plus, Trash2 } from "lucide-react";
-import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/useApi";
+import { Bot, Clock, FileText, FolderOpen, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  useProjects,
+  useCreateProject,
+  useDeleteProject,
+  useProjectFiles,
+  useProjectAgents,
+} from "@/hooks/useApi";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Project } from "@/types/api";
 
 // ── Create modal ──────────────────────────────────────────────────────────────
@@ -53,7 +61,7 @@ function CreateProjectModal({
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Name *</label>
             <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="My Project"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -63,7 +71,7 @@ function CreateProjectModal({
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Description</label>
             <textarea
-              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="What is this project about?"
               rows={3}
               value={description}
@@ -88,6 +96,19 @@ function CreateProjectModal({
   );
 }
 
+// ── Derived status badge ──────────────────────────────────────────────────────
+
+function ProjectStatusBadge({ isLoading, hasFiles, isProcessing }: {
+  isLoading: boolean;
+  hasFiles: boolean;
+  isProcessing: boolean;
+}) {
+  if (isLoading) return <Skeleton className="h-5 w-16 rounded-full" />;
+  if (isProcessing) return <Badge variant="warning">Processing</Badge>;
+  if (hasFiles) return <Badge variant="success">Active</Badge>;
+  return <Badge variant="secondary">Empty</Badge>;
+}
+
 // ── Project card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({ project }: { project: Project }) {
@@ -95,6 +116,16 @@ function ProjectCard({ project }: { project: Project }) {
   const del = useDeleteProject();
   const [confirming, setConfirming] = useState(false);
   const isDeleting = del.isPending && del.variables === project.id;
+
+  const { data: files, isLoading: filesLoading } = useProjectFiles(project.id);
+  const { data: agents, isLoading: agentsLoading } = useProjectAgents(project.id);
+
+  const isProcessing =
+    files?.some((f) => f.chunk_status === "pending" || f.chunk_status === "chunking") ?? false;
+
+  const lastActivityIso = [project.created_at, ...(files?.map((f) => f.uploaded_at) ?? [])].sort(
+    (a, b) => new Date(b).getTime() - new Date(a).getTime()
+  )[0];
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -106,15 +137,18 @@ function ProjectCard({ project }: { project: Project }) {
   };
 
   return (
-    <Card className="flex flex-col hover:border-primary/50 transition-colors cursor-pointer group">
+    <Card
+      className="group flex flex-col rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md cursor-pointer"
+      onClick={() => navigate(`/projects/${project.id}`)}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle
-            className="text-base truncate"
-            onClick={() => navigate(`/projects/${project.id}`)}
-          >
-            {project.name}
-          </CardTitle>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-accent/15">
+              <FolderOpen className="h-4 w-4 text-primary" />
+            </div>
+            <CardTitle className="truncate text-base">{project.name}</CardTitle>
+          </div>
 
           <button
             onClick={handleDelete}
@@ -122,7 +156,7 @@ function ProjectCard({ project }: { project: Project }) {
             disabled={isDeleting}
             title={confirming ? "Click again to confirm" : "Delete project"}
             className={cn(
-              "shrink-0 rounded px-1.5 py-1 text-xs font-medium transition-colors",
+              "shrink-0 rounded-md px-1.5 py-1 text-xs font-medium transition-colors",
               confirming
                 ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
                 : "text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
@@ -139,18 +173,45 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </CardHeader>
 
-      <CardContent
-        className="flex flex-1 flex-col gap-3"
-        onClick={() => navigate(`/projects/${project.id}`)}
-      >
-        {project.description && (
-          <p className="line-clamp-2 text-sm text-muted-foreground">
-            {project.description}
-          </p>
+      <CardContent className="flex flex-1 flex-col gap-4">
+        {project.description ? (
+          <p className="line-clamp-2 text-sm text-muted-foreground">{project.description}</p>
+        ) : (
+          <p className="text-sm italic text-muted-foreground/60">No description</p>
         )}
-        <p className="mt-auto text-xs text-muted-foreground">
-          Created {new Date(project.created_at).toLocaleDateString()}
-        </p>
+
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            {filesLoading ? (
+              <Skeleton className="h-3.5 w-4" />
+            ) : (
+              <span className="font-medium text-foreground">{files?.length ?? 0}</span>
+            )}
+            docs
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Bot className="h-3.5 w-3.5" />
+            {agentsLoading ? (
+              <Skeleton className="h-3.5 w-4" />
+            ) : (
+              <span className="font-medium text-foreground">{agents?.length ?? 0}</span>
+            )}
+            agents
+          </span>
+        </div>
+
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {lastActivityIso ? formatRelativeTime(lastActivityIso) : "—"}
+          </span>
+          <ProjectStatusBadge
+            isLoading={filesLoading}
+            hasFiles={(files?.length ?? 0) > 0}
+            isProcessing={isProcessing}
+          />
+        </div>
       </CardContent>
     </Card>
   );
@@ -166,7 +227,7 @@ export function ProjectsPage() {
     <div className="mx-auto max-w-5xl px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Projects</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Each project has its own document context and agents.
           </p>
@@ -178,18 +239,23 @@ export function ProjectsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-20">
-          <Spinner className="h-6 w-6" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-[188px] rounded-xl" />
+          ))}
         </div>
       ) : projects?.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-          <FolderOpen className="h-12 w-12 opacity-30" />
-          <p className="text-sm">No projects yet.</p>
-          <Button variant="outline" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            Create your first project
-          </Button>
-        </div>
+        <EmptyState
+          icon={FolderOpen}
+          title="No projects yet"
+          description="Create your first project to start uploading documents and building agents."
+          action={
+            <Button variant="outline" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" />
+              Create your first project
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects?.map((p) => (

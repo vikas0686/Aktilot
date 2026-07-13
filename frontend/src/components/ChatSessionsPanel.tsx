@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2, MessageSquare, Plus } from "lucide-react";
 import { useAgentSessions, useCreateChatSession } from "@/hooks/useApi";
-import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 function formatUpdatedAt(iso: string) {
@@ -36,7 +37,7 @@ export function ChatSessionsPanel({
 
   return (
     <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-l border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Chats
         </span>
@@ -44,7 +45,7 @@ export function ChatSessionsPanel({
           onClick={handleNewChat}
           disabled={createSession.isPending}
           title="New Chat"
-          className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
         >
           {createSession.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -56,19 +57,25 @@ export function ChatSessionsPanel({
 
       <div className="flex-1 overflow-y-auto p-2">
         {isLoading ? (
-          <div className="flex justify-center py-6">
-            <Spinner className="h-4 w-4" />
+          <div className="space-y-1.5 px-1 py-1">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-11 w-full rounded-lg" />
+            ))}
           </div>
         ) : sessions?.length === 0 ? (
-          <div className="px-2 py-4 text-center">
-            <p className="text-xs text-muted-foreground">No chats yet.</p>
-            <button
-              onClick={handleNewChat}
-              className="mt-1.5 text-xs text-primary hover:underline"
-            >
-              Start your first chat
-            </button>
-          </div>
+          <EmptyState
+            size="sm"
+            icon={MessageSquare}
+            title="No chats yet"
+            action={
+              <button
+                onClick={handleNewChat}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Start your first chat
+              </button>
+            }
+          />
         ) : (
           <div className="space-y-0.5">
             {sessions?.map((session) => {
@@ -78,9 +85,12 @@ export function ChatSessionsPanel({
                   key={session.id}
                   to={`/projects/${projectId}/agents/${agentId}/chat/${session.id}`}
                   className={cn(
-                    "flex items-start gap-2 rounded px-2 py-2 text-sm transition-colors",
+                    "relative flex items-start gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",
                     isActive
-                      ? "bg-primary/10 font-medium text-primary"
+                      ? cn(
+                          "bg-primary/10 font-medium text-primary",
+                          "before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+                        )
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >

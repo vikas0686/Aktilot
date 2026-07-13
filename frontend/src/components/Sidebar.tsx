@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   Bot,
-  ChevronDown,
-  ChevronRight,
   FileText,
   FolderOpen,
   Loader2,
@@ -13,13 +12,30 @@ import {
 import {
   useCreateProject,
   useProjects,
+  useProject,
   useProjectAgents,
 } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/types/api";
+
+const navItemClass = (active: boolean) =>
+  cn(
+    "relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
+    active
+      ? cn(
+          "bg-primary/10 font-medium text-primary",
+          "before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+        )
+      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+  );
+
+// Sidebar isn't inside the routed <Route> tree (it's a sibling in AppShell), so
+// it can't use useParams() — parse the project/agent context from the URL directly.
+const PROJECT_ROUTE_RE =
+  /^\/projects\/([^/]+)(?:\/agents(?:\/([^/]+)\/chat(?:\/([^/]+))?)?)?$/;
 
 // ── New Project modal ─────────────────────────────────────────────────────────
 
@@ -53,7 +69,7 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Name *</label>
             <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="My Project"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -63,7 +79,7 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Description</label>
             <input
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="Optional description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -87,153 +103,123 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Agents sub-tree (only mounts when the project row is expanded) ─────────────
+// ── Workspace-level nav: flat list of all projects ────────────────────────────
 
-function AgentsSubTree({ projectId }: { projectId: string }) {
-  const { data: agents, isLoading } = useProjectAgents(projectId);
-  const [open, setOpen] = useState(true);
-  const location = useLocation();
-  const agentsPath = `/projects/${projectId}/agents`;
-  const isAgentsActive = location.pathname === agentsPath;
+function AllProjectsNav({ onCreate }: { onCreate: () => void }) {
+  const { data: projects, isLoading } = useProjects();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-1.5 p-2">
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-9 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (projects?.length === 0) {
+    return (
+      <div className="p-2">
+        <EmptyState
+          size="sm"
+          icon={FolderOpen}
+          title="No projects yet"
+          action={
+            <button
+              onClick={onCreate}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Create your first project
+            </button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {/* Row: chevron (toggle) + "Agents" label (navigates to /agents page) */}
-      <div className="flex items-center gap-0.5">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label={open ? "Collapse agents" : "Expand agents"}
-        >
-          {open ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </button>
-        <Link
-          to={agentsPath}
-          className={cn(
-            "flex flex-1 min-w-0 items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium transition-colors",
-            isAgentsActive
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          )}
-        >
-          <Bot className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">Agents</span>
-          {isLoading && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
+    <div className="space-y-0.5 p-2">
+      {projects?.map((p) => (
+        <Link key={p.id} to={`/projects/${p.id}`} className={navItemClass(false)}>
+          <FolderOpen className="h-4 w-4 shrink-0" />
+          <span className="truncate">{p.name}</span>
         </Link>
-      </div>
-
-      {/* Individual agents */}
-      {open && (
-        <div className="ml-6 space-y-0.5 border-l border-border pl-2">
-          {agents?.map((agent) => {
-            const chatPath = `/projects/${projectId}/agents/${agent.id}/chat`;
-            const isActive = location.pathname === chatPath;
-            return (
-              <Link
-                key={agent.id}
-                to={chatPath}
-                className={cn(
-                  "flex items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors",
-                  isActive
-                    ? "bg-primary/10 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{agent.name}</span>
-              </Link>
-            );
-          })}
-
-          {/* New Agent shortcut */}
-          <Link
-            to={agentsPath}
-            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-            <span>New Agent</span>
-          </Link>
-        </div>
-      )}
+      ))}
     </div>
   );
 }
 
-// ── Single project row ────────────────────────────────────────────────────────
+// ── Project-scoped nav: shown once you're inside a project ───────────────────
 
-function ProjectTreeItem({ project }: { project: Project }) {
+function ProjectContextNav({
+  projectId,
+  agentId,
+}: {
+  projectId: string;
+  agentId?: string;
+}) {
   const location = useLocation();
-  const projectPath = `/projects/${project.id}`;
-  const isOnProject = location.pathname.startsWith(projectPath);
-  const [open, setOpen] = useState(false);
+  const { data: project, isLoading: projectLoading } = useProject(projectId);
+  const { data: agents, isLoading: agentsLoading } = useProjectAgents(projectId);
 
-  // Auto-expand when the active route is inside this project
-  useEffect(() => {
-    if (isOnProject) setOpen(true);
-  }, [isOnProject]);
-
-  // "Knowledge Base" is active only on the exact project path (not /agents or /agents/*)
-  const isKbActive = location.pathname === projectPath;
+  const kbPath = `/projects/${projectId}`;
+  const agentsPath = `/projects/${projectId}/agents`;
+  const isKbActive = location.pathname === kbPath;
+  const isAgentsActive = location.pathname === agentsPath;
 
   return (
-    <div>
-      {/* Project row */}
-      <div className="flex items-center gap-0.5">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label={open ? "Collapse" : "Expand"}
-        >
-          {open ? (
-            <ChevronDown className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
-          )}
-        </button>
-        <Link
-          to={projectPath}
-          className={cn(
-            "flex flex-1 min-w-0 items-center gap-2 rounded px-2 py-1.5 text-sm font-medium transition-colors",
-            isOnProject
-              ? "text-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          )}
-        >
-          <FolderOpen
-            className={cn(
-              "h-4 w-4 shrink-0",
-              isOnProject ? "text-primary" : ""
+    <div className="flex-1 overflow-y-auto p-2">
+      <Link
+        to="/"
+        className="mb-3 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        All Projects
+      </Link>
+
+      <div className="mb-4 px-2.5">
+        {projectLoading ? (
+          <Skeleton className="h-5 w-32" />
+        ) : (
+          <>
+            <p className="truncate text-sm font-semibold">{project?.name}</p>
+            {project?.description && (
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                {project.description}
+              </p>
             )}
-          />
-          <span className="truncate">{project.name}</span>
-        </Link>
+          </>
+        )}
       </div>
 
-      {/* Children */}
-      {open && (
-        <div className="ml-6 space-y-0.5 border-l border-border pl-2">
-          {/* Knowledge Base */}
-          <Link
-            to={projectPath}
-            className={cn(
-              "flex items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors",
-              isKbActive
-                ? "bg-primary/10 font-medium text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <FileText className="h-3.5 w-3.5 shrink-0" />
-            <span>Knowledge Base</span>
-          </Link>
+      <div className="space-y-0.5">
+        <Link to={kbPath} className={navItemClass(isKbActive)}>
+          <FileText className="h-3.5 w-3.5 shrink-0" />
+          <span>Knowledge Base</span>
+        </Link>
 
-          {/* Agents sub-tree — fetches agents lazily on mount */}
-          <AgentsSubTree projectId={project.id} />
-        </div>
-      )}
+        <Link to={agentsPath} className={cn(navItemClass(isAgentsActive), "font-medium")}>
+          <Bot className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">Agents</span>
+          {agentsLoading && <Loader2 className="h-3 w-3 animate-spin opacity-50" />}
+        </Link>
+
+        {!agentsLoading && agents && agents.length > 0 && (
+          <div className="ml-6 space-y-0.5 border-l border-border pl-2">
+            {agents.map((agent) => {
+              const chatPath = `/projects/${projectId}/agents/${agent.id}/chat`;
+              const isActive = agent.id === agentId;
+              return (
+                <Link key={agent.id} to={chatPath} className={navItemClass(isActive)}>
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{agent.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -241,65 +227,39 @@ function ProjectTreeItem({ project }: { project: Project }) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const { data: projects, isLoading } = useProjects();
+  const location = useLocation();
   const [showCreate, setShowCreate] = useState(false);
+
+  const match = location.pathname.match(PROJECT_ROUTE_RE);
+  const projectId = match?.[1];
+  const agentId = match?.[2];
 
   return (
     <>
-      <aside className="flex w-60 shrink-0 flex-col overflow-hidden border-r border-border bg-card">
-        {/* Workspace header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3.5">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Workspace
+            {projectId ? "Project" : "Projects"}
           </span>
           <button
             onClick={() => setShowCreate(true)}
             title="New Project"
-            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {/* Tree */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {/* Projects label */}
-          <div className="mb-1 px-2 py-1">
-            <Link
-              to="/"
-              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Projects
-            </Link>
+        {projectId ? (
+          <ProjectContextNav projectId={projectId} agentId={agentId} />
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <AllProjectsNav onCreate={() => setShowCreate(true)} />
           </div>
-
-          {isLoading ? (
-            <div className="flex justify-center py-6">
-              <Spinner className="h-4 w-4" />
-            </div>
-          ) : projects?.length === 0 ? (
-            <div className="px-2 py-4 text-center">
-              <p className="text-xs text-muted-foreground">No projects yet.</p>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="mt-1.5 text-xs text-primary hover:underline"
-              >
-                Create your first project
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-0.5">
-              {projects?.map((p) => (
-                <ProjectTreeItem key={p.id} project={p} />
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </aside>
 
-      {showCreate && (
-        <NewProjectModal onClose={() => setShowCreate(false)} />
-      )}
+      {showCreate && <NewProjectModal onClose={() => setShowCreate(false)} />}
     </>
   );
 }
