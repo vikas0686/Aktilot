@@ -64,9 +64,9 @@ All three workflows run on a **Temporal Cluster** for durable, individually-retr
 
 A 35-second, end-to-end walkthrough — create a project, upload a document, spin up an agent, and ask it a question with real hybrid-retrieval sources and Temporal workflow timing.
 
-<video src="docs/demo.mp4" controls muted width="800">
-  Your browser can't play this video inline — <a href="docs/demo.mp4">download it here</a>.
-</video>
+![Aktilot demo](docs/demo.gif)
+
+*(GIF for inline preview — [watch the full-quality MP4](docs/demo.mp4).)*
 
 ---
 
