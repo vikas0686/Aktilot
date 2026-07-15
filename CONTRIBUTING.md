@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing! This document covers how to set up your development environment, the branching and PR workflow, and the code standards we follow.
 
+By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ---
 
 ## Table of Contents
@@ -99,7 +101,7 @@ ruff format .         # format
 ruff check --fix .    # auto-fix safe issues
 ```
 
-Rules enforced: `E`, `F`, `I` (isort). Config lives in `pyproject.toml` (once added) or ruff defaults.
+Rules enforced: ruff defaults (`E4`, `E7`, `E9`, `F`) plus `I` (isort). Config lives in `backend/pyproject.toml`.
 
 - Prefer `async def` for all I/O-bound functions
 - Use Pydantic models for all request/response schemas — no raw dicts crossing the API boundary
@@ -150,4 +152,4 @@ alembic upgrade head
 
 ## Questions?
 
-Open a [Discussion](https://github.com/your-org/aktilot/discussions) or comment on an existing issue.
+Open a [Discussion](https://github.com/vikas0686/aktilot/discussions) or comment on an existing issue.
