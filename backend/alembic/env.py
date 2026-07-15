@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from db.base import Base
 from db.models import (  # noqa: F401 — import models so metadata is populated
     agent,
+    chat_session,
     file,
     message,
     project,
