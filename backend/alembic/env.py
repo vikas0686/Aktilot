@@ -2,13 +2,19 @@ import os
 import sys
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from db.base import Base
-from db.models import project, file, agent, message  # noqa: F401 — import models so metadata is populated
+from db.models import (  # noqa: F401 — import models so metadata is populated
+    agent,
+    file,
+    message,
+    project,
+)
 
 config = context.config
 
