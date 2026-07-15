@@ -23,7 +23,7 @@ opentelemetry-sdk>=1.25.0
 opentelemetry-exporter-otlp-proto-grpc>=1.25.0
 opentelemetry-instrumentation-fastapi>=0.46b0
 opentelemetry-instrumentation-sqlalchemy>=0.46b0
-opentelemetry-instrumentation-httpx>=0.46b0
+opentelemetry-instrumentation-httpx>=0.64b0
 tiktoken>=0.7.0
 # testing
 pytest>=8.0
