@@ -31,9 +31,9 @@ class OpenAIChatProvider:
 
         return ChatResult(
             content=resp.choices[0].message.content or "",
-            prompt_tokens=resp.usage.prompt_tokens,
-            completion_tokens=resp.usage.completion_tokens,
-            total_tokens=resp.usage.total_tokens,
+            prompt_tokens=resp.usage.prompt_tokens if resp.usage else 0,
+            completion_tokens=resp.usage.completion_tokens if resp.usage else 0,
+            total_tokens=resp.usage.total_tokens if resp.usage else 0,
             finish_reason=resp.choices[0].finish_reason or "unknown",
         )
 
