@@ -3,17 +3,16 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from openai import AsyncOpenAI, AuthenticationError, RateLimitError
 from rank_bm25 import BM25Okapi
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from models.schemas import ChatResponse, RetrievedChunk, ToolStep
 from services.agent_service import get as get_agent
+from services.llm import get_chat_provider, get_embedding_provider
+from services.llm.base import ProviderAuthError, ProviderServiceError
 from services.message_service import create as create_message
 from vectorstore.chroma_store import search as chroma_search
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 _FALLBACK_SYSTEM_PROMPT = (
     "You are a document assistant. Use only the supplied context to answer. "
@@ -48,7 +47,8 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
     try:
         # Step 1: Extract search keywords from the question
         t = _now()
-        kw_resp = await client.chat.completions.create(
+        chat_provider = get_chat_provider()
+        kw_result = await chat_provider.generate(
             model=settings.chat_model,
             messages=[
                 {
@@ -62,7 +62,7 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
             ],
             temperature=0,
         )
-        raw = kw_resp.choices[0].message.content or "[]"
+        raw = kw_result.content or "[]"
         try:
             keywords: list[str] = json.loads(raw)
         except Exception:
@@ -71,10 +71,11 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
 
         # Step 2: Embed question and search project's ChromaDB collection
         t = _now()
-        embed_resp = await client.embeddings.create(
-            model=settings.embedding_model, input=question
+        embedding_provider = get_embedding_provider()
+        embed_result = await embedding_provider.embed(
+            model=settings.embedding_model, texts=[question]
         )
-        query_vec = embed_resp.data[0].embedding
+        query_vec = embed_result.embeddings[0]
         raw_results = chroma_search(project_id, query_vec, k=20)
         steps.append(
             _step(
@@ -150,7 +151,7 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
 
         # Step 5: Generate final answer using agent's system prompt
         t = _now()
-        answer_resp = await client.chat.completions.create(
+        answer_result = await chat_provider.generate(
             model=settings.chat_model,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -161,15 +162,15 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
             ],
             temperature=0.2,
         )
-        answer = answer_resp.choices[0].message.content or ""
+        answer = answer_result.content
         steps.append(_step("Generate Answer", t, question, f"{len(answer)} chars"))
 
-    except AuthenticationError:
+    except ProviderAuthError:
         raise HTTPException(
-            401, "Invalid OpenAI API key. Check OPENAI_API_KEY in your .env."
+            401, "Invalid API key. Check your provider API key in .env."
         )
-    except RateLimitError:
-        raise HTTPException(429, "OpenAI rate limit exceeded. Try again shortly.")
+    except ProviderServiceError:
+        raise HTTPException(429, "Provider rate limit exceeded. Try again shortly.")
     except HTTPException:
         raise
     except Exception as e:

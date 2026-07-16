@@ -18,7 +18,6 @@ import time
 import uuid
 from pathlib import Path
 
-from openai import AuthenticationError
 from sqlalchemy import select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -28,6 +27,8 @@ from config import settings
 from db.models.file import File
 from db.session import AsyncSessionFactory
 from observability import metrics as m
+from services.llm import get_embedding_provider
+from services.llm.base import ProviderAuthError
 from services.project_chunk_service import _read_file, _split_text
 from vectorstore.chroma_store import add_chunks
 from vectorstore.chroma_store import delete_file as chroma_delete_file
@@ -111,7 +112,7 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
         "rag.collection_name": project_id,
         "rag.model": settings.embedding_model,
         "rag.embedding_model": settings.embedding_model,
-        "rag.provider": "openai",
+        "rag.provider": settings.embedding_provider,
         "rag.call_site": "chunk_batch",
     }
     info = activity.info()
@@ -124,7 +125,7 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
     t_embed = time.perf_counter()
     try:
         embeddings, usage_tokens = await _embed_with_usage(chunks)
-    except AuthenticationError as exc:
+    except ProviderAuthError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
@@ -189,19 +190,14 @@ async def _embed_with_usage(chunks: list[str]) -> tuple[list[list[float]], int]:
     and accumulates total token usage across all batches.
     Returns (embeddings, total_tokens).
     """
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    provider = get_embedding_provider()
     vectors: list[list[float]] = []
     total_tokens = 0
 
     for i in range(0, len(chunks), _EMBED_BATCH):
         batch = chunks[i : i + _EMBED_BATCH]
-        resp = await client.embeddings.create(
-            model=settings.embedding_model, input=batch
-        )
-        vectors.extend(item.embedding for item in resp.data)
-        if resp.usage:
-            total_tokens += resp.usage.total_tokens
+        result = await provider.embed(model=settings.embedding_model, texts=batch)
+        vectors.extend(result.embeddings)
+        total_tokens += result.total_tokens
 
     return vectors, total_tokens

@@ -11,12 +11,11 @@ Each test patches only the external dependency under test.
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
-from openai import AuthenticationError, RateLimitError
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
 
+from services.llm.base import ChatResult, EmbedResult, ProviderAuthError, ProviderServiceError
 from temporal.activities.chat_activities import (
     embed_query,
     extract_keywords,
@@ -48,52 +47,32 @@ FAKE_CHUNKS = [
 ]
 
 
-def _usage(prompt: int = 10, completion: int = 5, total: int = 15) -> MagicMock:
-    # Real int fields — the activities feed these into OTel histograms, which
-    # do numeric bounds checks and reject MagicMock's auto-generated attrs.
-    u = MagicMock()
-    u.prompt_tokens = prompt
-    u.completion_tokens = completion
-    u.total_tokens = total
-    return u
+def _chat_result(content: str, prompt=10, completion=5) -> ChatResult:
+    return ChatResult(
+        content=content,
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        total_tokens=prompt + completion,
+        finish_reason="stop",
+    )
 
 
-def _kw_resp(keywords: list) -> MagicMock:
-    m = MagicMock()
-    m.choices = [MagicMock()]
-    m.choices[0].message.content = json.dumps(keywords)
-    m.choices[0].finish_reason = "stop"
-    m.usage = _usage()
-    return m
+def _embed_result(vector: list[float], tokens=10) -> EmbedResult:
+    return EmbedResult(embeddings=[vector], total_tokens=tokens)
 
 
-def _embed_resp(vector: list[float]) -> MagicMock:
-    m = MagicMock()
-    m.data = [MagicMock()]
-    m.data[0].embedding = vector
-    m.usage = _usage()
-    return m
+def _mock_chat_provider(return_value=None, side_effect=None):
+    provider = MagicMock()
+    provider.generate = AsyncMock(return_value=return_value, side_effect=side_effect)
+    factory = MagicMock(return_value=provider)
+    return factory
 
 
-def _answer_resp(text: str) -> MagicMock:
-    m = MagicMock()
-    m.choices = [MagicMock()]
-    m.choices[0].message.content = text
-    m.choices[0].finish_reason = "stop"
-    m.usage = _usage()
-    return m
-
-
-def _make_auth_error() -> AuthenticationError:
-    req = httpx.Request("POST", "https://api.openai.com/")
-    resp = httpx.Response(401, request=req)
-    return AuthenticationError(message="Invalid API key", response=resp, body=None)
-
-
-def _make_rate_error() -> RateLimitError:
-    req = httpx.Request("POST", "https://api.openai.com/")
-    resp = httpx.Response(429, request=req)
-    return RateLimitError(message="Rate limit", response=resp, body=None)
+def _mock_embedding_provider(return_value=None, side_effect=None):
+    provider = MagicMock()
+    provider.embed = AsyncMock(return_value=return_value, side_effect=side_effect)
+    factory = MagicMock(return_value=provider)
+    return factory
 
 
 def _mock_db_factory(agent=None):
@@ -116,31 +95,24 @@ def _mock_db_factory(agent=None):
 
 
 async def test_extract_keywords_returns_list():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(
-            return_value=_kw_resp(["invoice", "total"])
-        )
+    factory = _mock_chat_provider(return_value=_chat_result(json.dumps(["invoice", "total"])))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         result = await _env.run(extract_keywords, "What is the invoice total?")
 
     assert result == ["invoice", "total"]
 
 
 async def test_extract_keywords_fallback_on_bad_json():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        bad = MagicMock()
-        bad.choices = [MagicMock()]
-        bad.choices[0].message.content = "not valid json"
-        bad.choices[0].finish_reason = "stop"
-        bad.usage = _usage()
-        mock_openai.chat.completions.create = AsyncMock(return_value=bad)
+    factory = _mock_chat_provider(return_value=_chat_result("not valid json"))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         result = await _env.run(extract_keywords, "find the invoice")
 
     assert result == ["find", "the", "invoice"]
 
 
 async def test_extract_keywords_auth_error_raises_non_retryable():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(side_effect=_make_auth_error())
+    factory = _mock_chat_provider(side_effect=ProviderAuthError("Invalid API key"))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(extract_keywords, "test?")
 
@@ -149,8 +121,8 @@ async def test_extract_keywords_auth_error_raises_non_retryable():
 
 
 async def test_extract_keywords_rate_limit_raises_retryable():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(side_effect=_make_rate_error())
+    factory = _mock_chat_provider(side_effect=ProviderServiceError("Rate limit"))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(extract_keywords, "test?")
 
@@ -162,8 +134,8 @@ async def test_extract_keywords_rate_limit_raises_retryable():
 
 
 async def test_embed_query_returns_vector():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.embeddings.create = AsyncMock(return_value=_embed_resp(FAKE_VECTOR))
+    factory = _mock_embedding_provider(return_value=_embed_result(FAKE_VECTOR))
+    with patch("temporal.activities.chat_activities.get_embedding_provider", factory):
         result = await _env.run(embed_query, "What is the total?")
 
     assert result == FAKE_VECTOR
@@ -171,8 +143,8 @@ async def test_embed_query_returns_vector():
 
 
 async def test_embed_query_auth_error_raises_non_retryable():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.embeddings.create = AsyncMock(side_effect=_make_auth_error())
+    factory = _mock_embedding_provider(side_effect=ProviderAuthError("Invalid API key"))
+    with patch("temporal.activities.chat_activities.get_embedding_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(embed_query, "test")
 
@@ -232,10 +204,8 @@ async def test_hybrid_rank_vec_score_is_one_minus_distance():
 
 
 async def test_generate_answer_returns_string():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(
-            return_value=_answer_resp("The total is $500.")
-        )
+    factory = _mock_chat_provider(return_value=_chat_result("The total is $500."))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         result = await _env.run(
             generate_answer,
             "What is the total?",
@@ -247,8 +217,8 @@ async def test_generate_answer_returns_string():
 
 
 async def test_generate_answer_auth_error_raises_non_retryable():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(side_effect=_make_auth_error())
+    factory = _mock_chat_provider(side_effect=ProviderAuthError("Invalid API key"))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(generate_answer, "?", "ctx", "sys")
 
@@ -257,8 +227,8 @@ async def test_generate_answer_auth_error_raises_non_retryable():
 
 
 async def test_generate_answer_rate_limit_raises_retryable():
-    with patch("temporal.activities.chat_activities._openai") as mock_openai:
-        mock_openai.chat.completions.create = AsyncMock(side_effect=_make_rate_error())
+    factory = _mock_chat_provider(side_effect=ProviderServiceError("Rate limit"))
+    with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(generate_answer, "?", "ctx", "sys")
 

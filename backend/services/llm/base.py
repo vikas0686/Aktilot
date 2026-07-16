@@ -26,7 +26,9 @@ class ProviderAuthError(Exception):
 
 
 class ProviderServiceError(Exception):
-    pass
+    def __init__(self, message: str, reason: str = "unknown"):
+        super().__init__(message)
+        self.reason = reason
 
 
 class ProviderNotAvailableError(Exception):

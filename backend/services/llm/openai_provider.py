@@ -22,7 +22,7 @@ class OpenAIChatProvider:
         except AuthenticationError as exc:
             raise ProviderAuthError(str(exc)) from exc
         except RateLimitError as exc:
-            raise ProviderServiceError(str(exc)) from exc
+            raise ProviderServiceError(str(exc), reason="rate_limit") from exc
 
         return ChatResult(
             content=resp.choices[0].message.content or "",
@@ -50,7 +50,7 @@ class OpenAIEmbeddingProvider:
         except AuthenticationError as exc:
             raise ProviderAuthError(str(exc)) from exc
         except RateLimitError as exc:
-            raise ProviderServiceError(str(exc)) from exc
+            raise ProviderServiceError(str(exc), reason="rate_limit") from exc
 
         return EmbedResult(
             embeddings=[item.embedding for item in resp.data],
