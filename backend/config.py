@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     otel_endpoint: str = "http://localhost:4317"
     environment: str = "development"
     app_version: str = "0.1.0"
+    # public share links
+    share_visitor_cookie_name: str = "aktilot_vid"
+    share_visitor_hourly_message_cap: int = 20
+    share_default_daily_message_cap: int = 200
+    share_visitor_retention_days: int = 7
+    share_retention_sweep_interval_seconds: int = 3600
 
     model_config = {"env_file": ".env"}
 
