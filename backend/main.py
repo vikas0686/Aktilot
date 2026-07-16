@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,6 +18,7 @@ from api.routes import (
 )
 from db.session import engine
 from observability.otel import configure_otel
+from services import retention_sweeper
 from temporal.client import close_temporal_client, init_temporal_client
 
 # Bootstrap OTel before the app object is created so the FastAPI instrumentor
@@ -27,7 +30,11 @@ SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_temporal_client()
+    sweep_task = asyncio.create_task(retention_sweeper.run_forever())
     yield
+    sweep_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sweep_task
     close_temporal_client()
 
 
