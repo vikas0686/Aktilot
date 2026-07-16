@@ -28,23 +28,17 @@ def _unwrap_app_error(exc: WorkflowFailureError) -> ApplicationError | None:
     return cause if isinstance(cause, ApplicationError) else None
 
 
-@router.post("/{agent_id}/chat", response_model=ChatResponse)
-async def chat(
-    agent_id: uuid.UUID,
-    body: ChatRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    # Pre-flight: verify agent exists before dispatching to Temporal
-    await agent_service.get(db, agent_id)
-    session = await session_service.get(db, body.session_id)
-    if session.agent_id != agent_id:
-        raise HTTPException(404, "Chat session not found for this agent")
-
+async def run_chat_workflow(
+    agent_id: uuid.UUID, session_id: uuid.UUID, question: str
+) -> ChatResponse:
+    """Execute the durable RAG chat pipeline. Shared by the authenticated
+    admin chat route and the public share-link chat route — the workflow
+    itself has no notion of who is asking, only which agent/session."""
     tc = await get_temporal_client()
     try:
         result: dict = await tc.execute_workflow(
             ChatWorkflow.run,
-            args=[str(agent_id), str(body.session_id), body.question],
+            args=[str(agent_id), str(session_id), question],
             id=f"chat-{uuid.uuid4()}",
             task_queue=TASK_QUEUE,
             execution_timeout=timedelta(minutes=2),
@@ -78,6 +72,21 @@ async def chat(
             for s in result["steps"]
         ],
     )
+
+
+@router.post("/{agent_id}/chat", response_model=ChatResponse)
+async def chat(
+    agent_id: uuid.UUID,
+    body: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    # Pre-flight: verify agent exists before dispatching to Temporal
+    await agent_service.get(db, agent_id)
+    session = await session_service.get(db, body.session_id)
+    if session.agent_id != agent_id:
+        raise HTTPException(404, "Chat session not found for this agent")
+
+    return await run_chat_workflow(agent_id, body.session_id, body.question)
 
 
 @router.get("/{agent_id}/messages", response_model=list[MessageResponse])

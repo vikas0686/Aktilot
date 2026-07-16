@@ -133,6 +133,8 @@ class PublicAgentResponse(BaseModel):
     else that would reveal the parent project or how the agent is configured.
     """
 
+    model_config = ConfigDict(from_attributes=True)
+
     name: str
     description: str | None
 

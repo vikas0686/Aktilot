@@ -62,9 +62,7 @@ async def list_for_agent_and_visitor(
 ) -> list[ChatSession]:
     result = await db.execute(
         select(ChatSession)
-        .where(
-            ChatSession.agent_id == agent_id, ChatSession.visitor_id == visitor_id
-        )
+        .where(ChatSession.agent_id == agent_id, ChatSession.visitor_id == visitor_id)
         .order_by(ChatSession.updated_at.desc())
     )
     return list(result.scalars().all())
