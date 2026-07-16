@@ -11,6 +11,7 @@ htmlcov/
 *.egg-info/
 dist/
 build/
+.python-version
 
 # ── Backend runtime data (never commit these) ─────────────────────────────────
 backend/uploads/

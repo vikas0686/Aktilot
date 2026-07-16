@@ -5,7 +5,9 @@ from pathlib import Path
 class Settings(BaseSettings):
     openai_api_key: str = ""
     context_dir: Path = Path("context")
+    llm_provider: str = "openai"
     chat_model: str = "gpt-4o-mini"
+    embedding_provider: str = "openai"
     embedding_model: str = "text-embedding-3-small"
     # new infra
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/docai"
