@@ -88,7 +88,7 @@ class TestOpenAIChatProvider:
             )
 
     @pytest.mark.asyncio
-    async def test_generate_raises_provider_rate_limit_error(self):
+    async def test_generate_raises_provider_service_error_with_reason(self):
         from openai import RateLimitError
 
         provider = OpenAIChatProvider(api_key="test-key")
@@ -100,11 +100,13 @@ class TestOpenAIChatProvider:
             )
         )
 
-        with pytest.raises(ProviderServiceError):
+        with pytest.raises(ProviderServiceError) as exc:
             await provider.generate(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": "Hi"}],
             )
+
+        assert exc.value.reason == "rate_limit"
 
     @pytest.mark.asyncio
     async def test_generate_handles_empty_content(self):
@@ -207,8 +209,10 @@ class TestOpenAIEmbeddingProvider:
             )
         )
 
-        with pytest.raises(ProviderServiceError):
+        with pytest.raises(ProviderServiceError) as exc:
             await provider.embed(
                 model="text-embedding-3-small",
                 texts=["hello"],
             )
+
+        assert exc.value.reason == "rate_limit"

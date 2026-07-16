@@ -166,12 +166,12 @@ cd frontend && npm test
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | Yes* | Your OpenAI API key (*required only if using OpenAI as provider) |
+| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (asyncpg) |
 | `TEMPORAL_ADDRESS` | No | Temporal server address (default: `localhost:7233`) |
-| `LLM_PROVIDER` | No | Chat provider (default: `openai`) |
+| `LLM_PROVIDER` | No | Chat provider (default: `openai`). Currently supported: `openai` |
 | `CHAT_MODEL` | No | Chat model to use (default: `gpt-4o-mini`) |
-| `EMBEDDING_PROVIDER` | No | Embedding provider (default: `openai`) |
+| `EMBEDDING_PROVIDER` | No | Embedding provider (default: `openai`). Currently supported: `openai` |
 | `EMBEDDING_MODEL` | No | Embedding model (default: `text-embedding-3-small`) |
 | `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |

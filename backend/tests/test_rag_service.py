@@ -372,7 +372,7 @@ async def test_chat_auth_error_raises_401(db_session):
 async def test_chat_rate_limit_raises_429(db_session):
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=ProviderServiceError("Rate limit exceeded"),
+        chat_side_effect=ProviderServiceError("Rate limit exceeded", reason="rate_limit"),
     )
     with chat_patch, embed_patch:
         with pytest.raises(HTTPException) as exc:
