@@ -26,3 +26,8 @@ export function formatRelativeTime(iso: string): string {
   }
   return relativeFormatter.format(-Math.round(seconds / 60), "minute");
 }
+
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}

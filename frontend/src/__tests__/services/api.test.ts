@@ -29,6 +29,8 @@ import {
   chatSessionsApi,
   projectFilesApi,
   projectsApi,
+  shareApi,
+  publicChatApi,
 } from "@/services/api";
 
 beforeEach(() => vi.clearAllMocks());
@@ -151,5 +153,62 @@ describe("chatSessionsApi", () => {
   it("messages → GET /sessions/:id/messages", () => {
     chatSessionsApi.messages("session-1");
     expect(mockGet).toHaveBeenCalledWith("/sessions/session-1/messages");
+  });
+});
+
+// ── shareApi ──────────────────────────────────────────────────────────────────
+
+describe("shareApi", () => {
+  it("generate → POST /agents/:id/share with daily cap", () => {
+    shareApi.generate("agent-1", 50);
+    expect(mockPost).toHaveBeenCalledWith("/agents/agent-1/share", {
+      daily_message_cap: 50,
+    });
+  });
+
+  it("generate → POST /agents/:id/share with null cap when omitted", () => {
+    shareApi.generate("agent-1");
+    expect(mockPost).toHaveBeenCalledWith("/agents/agent-1/share", {
+      daily_message_cap: null,
+    });
+  });
+
+  it("revoke → DELETE /agents/:id/share", () => {
+    shareApi.revoke("agent-1");
+    expect(mockDelete).toHaveBeenCalledWith("/agents/agent-1/share");
+  });
+});
+
+// ── publicChatApi ─────────────────────────────────────────────────────────────
+
+describe("publicChatApi", () => {
+  it("getAgent → GET /public/agents/:slug", () => {
+    publicChatApi.getAgent("abc123");
+    expect(mockGet).toHaveBeenCalledWith("/public/agents/abc123");
+  });
+
+  it("listSessions → GET /public/agents/:slug/sessions", () => {
+    publicChatApi.listSessions("abc123");
+    expect(mockGet).toHaveBeenCalledWith("/public/agents/abc123/sessions");
+  });
+
+  it("createSession → POST /public/agents/:slug/sessions", () => {
+    publicChatApi.createSession("abc123");
+    expect(mockPost).toHaveBeenCalledWith("/public/agents/abc123/sessions");
+  });
+
+  it("sessionMessages → GET /public/agents/:slug/sessions/:id/messages", () => {
+    publicChatApi.sessionMessages("abc123", "session-1");
+    expect(mockGet).toHaveBeenCalledWith(
+      "/public/agents/abc123/sessions/session-1/messages"
+    );
+  });
+
+  it("send → POST /public/agents/:slug/chat with question and session_id", () => {
+    publicChatApi.send("abc123", "session-1", "Hello?");
+    expect(mockPost).toHaveBeenCalledWith("/public/agents/abc123/chat", {
+      question: "Hello?",
+      session_id: "session-1",
+    });
   });
 });

@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { CHAT_MODEL } from "@/lib/constants";
+import { formatDuration } from "@/lib/utils";
 import type { ChatResponse, RetrievedChunk, ToolStep } from "@/types/api";
 
 // Presentational chat pieces shared by the authenticated agent chat page and
@@ -23,11 +24,6 @@ const RETRIEVAL_STEP_NAMES = new Set([
   "Vector Search",
   "BM25 + Hybrid Rank",
 ]);
-
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
 
 export function TypingDots() {
   return (
