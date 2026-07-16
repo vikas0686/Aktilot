@@ -23,6 +23,19 @@ export interface Agent {
   system_prompt: string;
   top_k: number;
   created_at: string;
+  share_slug: string | null;
+  share_daily_message_cap: number | null;
+}
+
+export interface ShareLink {
+  share_slug: string;
+  share_path: string;
+  daily_message_cap: number | null;
+}
+
+export interface PublicAgent {
+  name: string;
+  description: string | null;
 }
 
 export interface AgentChatMessage {

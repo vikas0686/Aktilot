@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { projectsApi, projectFilesApi, agentsApi, agentChatApi, chatSessionsApi, filesApi, chunksApi, chatApi } from "@/services/api";
+import { projectsApi, projectFilesApi, agentsApi, agentChatApi, chatSessionsApi, filesApi, chunksApi, chatApi, shareApi, publicChatApi } from "@/services/api";
 import type { ProjectFile } from "@/types/api";
 
 // ── Projects ──────────────────────────────────────────────────────────────────
@@ -121,6 +121,79 @@ export function useAgent(agentId: string) {
     queryKey: ["agent", agentId] as const,
     queryFn: () => agentsApi.get(agentId).then((r) => r.data),
     enabled: !!agentId,
+  });
+}
+
+// ── Share Links ───────────────────────────────────────────────────────────────
+
+export function useGenerateShareLink(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, dailyMessageCap }: { agentId: string; dailyMessageCap?: number }) =>
+      shareApi.generate(agentId, dailyMessageCap).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentsKey(projectId) }),
+  });
+}
+
+export function useRevokeShareLink(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (agentId: string) => shareApi.revoke(agentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: agentsKey(projectId) }),
+  });
+}
+
+// ── Public (shared-link) chat ──────────────────────────────────────────────────
+
+export function usePublicAgent(slug: string) {
+  return useQuery({
+    queryKey: ["public-agent", slug] as const,
+    queryFn: () => publicChatApi.getAgent(slug).then((r) => r.data),
+    enabled: !!slug,
+    retry: false,
+  });
+}
+
+const publicSessionsKey = (slug: string) => ["public-sessions", slug] as const;
+
+export function usePublicSessions(slug: string) {
+  return useQuery({
+    queryKey: publicSessionsKey(slug),
+    queryFn: () => publicChatApi.listSessions(slug).then((r) => r.data),
+    enabled: !!slug,
+  });
+}
+
+export function useCreatePublicSession(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => publicChatApi.createSession(slug).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: publicSessionsKey(slug) }),
+  });
+}
+
+const publicSessionMessagesKey = (slug: string, sessionId: string) =>
+  ["public-session-messages", slug, sessionId] as const;
+
+export function usePublicSessionMessages(slug: string, sessionId: string | undefined) {
+  return useQuery({
+    queryKey: publicSessionMessagesKey(slug, sessionId ?? ""),
+    queryFn: () => publicChatApi.sessionMessages(slug, sessionId!).then((r) => r.data),
+    enabled: !!slug && !!sessionId,
+  });
+}
+
+export function useSendPublicMessage(slug: string, sessionId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (question: string) =>
+      publicChatApi.send(slug, sessionId!, question).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: publicSessionsKey(slug) });
+      if (sessionId) {
+        qc.invalidateQueries({ queryKey: publicSessionMessagesKey(slug, sessionId) });
+      }
+    },
   });
 }
 
