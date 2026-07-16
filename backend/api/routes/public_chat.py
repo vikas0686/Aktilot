@@ -104,8 +104,19 @@ async def public_chat(
     daily_cap = (
         agent.share_daily_message_cap or settings.share_default_daily_message_cap
     )
+    daily_window_start = now - timedelta(days=1)
+    reset_at = agent.share_daily_cap_reset_at
+    if reset_at is not None:
+        # SQLite (used in tests) drops tzinfo on round-trip; Postgres doesn't.
+        # Normalize so the comparison below is never naive-vs-aware.
+        if reset_at.tzinfo is None:
+            reset_at = reset_at.replace(tzinfo=timezone.utc)
+        if reset_at > daily_window_start:
+            # Cap was (re)generated more recently than the rolling 24h window —
+            # don't count usage from before that point against the new cap.
+            daily_window_start = reset_at
     daily_count = await session_service.count_agent_visitor_messages_since(
-        db, agent.id, now - timedelta(days=1)
+        db, agent.id, daily_window_start
     )
     if daily_count >= daily_cap:
         raise HTTPException(

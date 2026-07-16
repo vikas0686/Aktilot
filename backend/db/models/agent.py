@@ -35,6 +35,12 @@ class Agent(Base):
     share_daily_message_cap: Mapped[int | None] = mapped_column(
         sa.Integer, nullable=True
     )
+    # Set every time the share link is (re)generated. The daily cap only
+    # counts messages from this point forward, so lowering the cap never
+    # retroactively blocks on usage that happened under a higher/older cap.
+    share_daily_cap_reset_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
 
     project: Mapped["Project"] = relationship("Project", back_populates="agents")  # noqa: F821
     messages: Mapped[list["Message"]] = relationship(  # noqa: F821

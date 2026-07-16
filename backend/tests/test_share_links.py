@@ -275,6 +275,38 @@ async def test_public_chat_daily_agent_cap_returns_429(client, db_session):
     assert r.status_code == 429
 
 
+async def test_regenerating_link_resets_daily_cap_window(client, db_session):
+    """Regression test: lowering the daily cap on regenerate must not
+    retroactively count messages sent earlier under a higher/older cap."""
+    _, aid = await _make_agent(client)
+    old_slug = await _share(client, aid)  # generous default cap
+    old_sid = (await client.post(f"/api/public/agents/{old_slug}/sessions")).json()[
+        "id"
+    ]
+
+    # 3 messages sent earlier today, before the cap was ever lowered.
+    for _ in range(3):
+        await message_service.create(
+            db_session, uuid.UUID(aid), "user", "hi", session_id=uuid.UUID(old_sid)
+        )
+
+    new_slug = await _share(client, aid, daily_cap=2)
+    new_sid = (await client.post(f"/api/public/agents/{new_slug}/sessions")).json()[
+        "id"
+    ]
+
+    patcher, _ = _mock_temporal()
+    with patcher:
+        r = await client.post(
+            f"/api/public/agents/{new_slug}/chat",
+            json={
+                "question": "first message after regenerating",
+                "session_id": new_sid,
+            },
+        )
+    assert r.status_code == 200
+
+
 async def test_public_chat_succeeds_under_limits(client):
     _, aid = await _make_agent(client)
     slug = await _share(client, aid)

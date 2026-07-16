@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -91,6 +92,10 @@ async def generate_share_link(
     agent.share_daily_message_cap = (
         daily_message_cap or settings.share_default_daily_message_cap
     )
+    # The daily cap only counts messages from this point forward — otherwise
+    # lowering the cap would retroactively block on usage from before the
+    # change, since messages/sessions aren't tied to a particular share_slug.
+    agent.share_daily_cap_reset_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(agent)
     return agent
