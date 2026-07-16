@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session import get_db
-from models.schemas import AgentCreate, AgentUpdate, AgentResponse
+from models.schemas import AgentCreate, AgentResponse, AgentUpdate
 from services import agent_service, project_service
 
 # Project-scoped: create + list

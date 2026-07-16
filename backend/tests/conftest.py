@@ -19,13 +19,6 @@ from unittest.mock import MagicMock
 sys.modules["chromadb"] = MagicMock()
 
 # ── Register all ORM models so Base.metadata knows about them ─────────────────
-from db.base import Base  # noqa: E402
-import db.models.project  # noqa: E402, F401
-import db.models.file  # noqa: E402, F401
-import db.models.agent  # noqa: E402, F401
-import db.models.chat_session  # noqa: E402, F401
-import db.models.message  # noqa: E402, F401
-
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
@@ -33,6 +26,13 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
     async_sessionmaker,
     create_async_engine,
 )
+
+import db.models.agent  # noqa: E402, F401
+import db.models.chat_session  # noqa: E402, F401
+import db.models.file  # noqa: E402, F401
+import db.models.message  # noqa: E402, F401
+import db.models.project  # noqa: E402, F401
+from db.base import Base  # noqa: E402
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -57,8 +57,8 @@ async def db_session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    from main import app
     from db.session import get_db
+    from main import app
 
     async def _override():
         yield db_session

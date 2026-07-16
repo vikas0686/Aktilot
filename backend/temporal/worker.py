@@ -16,7 +16,6 @@ from temporalio.worker import Worker
 
 from config import settings
 from observability.otel import configure_otel
-from temporal.interceptors import MetricsInterceptor
 from temporal.activities.chat_activities import (
     embed_query,
     extract_keywords,
@@ -32,6 +31,7 @@ from temporal.activities.document_activities import (
     read_and_split_file,
     update_file_status,
 )
+from temporal.interceptors import MetricsInterceptor
 from temporal.workflows.chat_workflow import TASK_QUEUE, ChatWorkflow
 from temporal.workflows.document_workflow import DocumentWorkflow
 
@@ -40,8 +40,9 @@ def _seed_gauge_cache() -> None:
     """Populate ObservableGauge caches from ChromaDB so values survive restarts."""
     try:
         import chromadb
-        from config import settings as _s
+
         import observability.metrics as m
+        from config import settings as _s
 
         client = chromadb.PersistentClient(path=str(_s.chroma_dir))
         for col in client.list_collections():
