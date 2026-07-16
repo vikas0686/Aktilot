@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, Clock, Loader2, MessageSquare, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Bot, Clock, Link2, Loader2, MessageSquare, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import {
   useProjectAgents,
   useCreateAgent,
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ShareAgentModal } from "@/components/ShareAgentModal";
 import { CHAT_MODEL } from "@/lib/constants";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Agent } from "@/types/api";
@@ -147,6 +148,7 @@ function AgentCard({
   const del = useDeleteAgent(projectId);
   const { data: sessions, isLoading: sessionsLoading } = useAgentSessions(agent.id);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const isDeleting = del.isPending && del.variables === agent.id;
 
@@ -174,6 +176,16 @@ function AgentCard({
             <span className="truncate text-sm font-medium">{agent.name}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              onClick={() => setSharing(true)}
+              title="Share agent"
+              className={cn(
+                "rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                agent.share_slug && "text-primary"
+              )}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => setEditing(true)}
               title="Edit agent"
@@ -224,6 +236,12 @@ function AgentCard({
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="secondary">{CHAT_MODEL}</Badge>
           <Badge variant="secondary">Top K {agent.top_k}</Badge>
+          {agent.share_slug && (
+            <Badge variant="secondary" className="gap-1 text-primary">
+              <Link2 className="h-3 w-3" />
+              Shared
+            </Badge>
+          )}
         </div>
 
         {/* Stats */}
@@ -264,6 +282,14 @@ function AgentCard({
           projectId={projectId}
           agent={agent}
           onClose={() => setEditing(false)}
+        />
+      )}
+
+      {sharing && (
+        <ShareAgentModal
+          projectId={projectId}
+          agent={agent}
+          onClose={() => setSharing(false)}
         />
       )}
     </>
