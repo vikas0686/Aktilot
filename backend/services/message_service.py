@@ -1,8 +1,9 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from db.models.chat_session import ChatSession
 from db.models.message import Message
 
 
@@ -23,9 +24,18 @@ async def create(
 
 
 async def list_for_agent(db: AsyncSession, agent_id: uuid.UUID) -> list[Message]:
+    """Messages visible in the authenticated admin app only.
+
+    Messages that belong to an anonymous visitor's chat session are excluded —
+    no admin/creator view is ever allowed to surface a visitor's conversation.
+    """
     result = await db.execute(
         select(Message)
-        .where(Message.agent_id == agent_id)
+        .outerjoin(ChatSession, Message.session_id == ChatSession.id)
+        .where(
+            Message.agent_id == agent_id,
+            or_(Message.session_id.is_(None), ChatSession.visitor_id.is_(None)),
+        )
         .order_by(Message.created_at.asc())
     )
     return list(result.scalars().all())
