@@ -2,8 +2,9 @@
 Tests for the provider factory.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from services.llm.base import ProviderNotAvailableError
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider

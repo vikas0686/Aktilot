@@ -1,10 +1,10 @@
+from config import settings
 from services.llm.base import (
     ChatProvider,
     EmbeddingProvider,
     ProviderNotAvailableError,
 )
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
-from config import settings
 
 
 def get_chat_provider(provider: str | None = None) -> ChatProvider:

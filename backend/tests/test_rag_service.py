@@ -18,19 +18,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+from services.agent_rag_service import _FALLBACK_SYSTEM_PROMPT
+from services.agent_rag_service import chat as rag_chat
+from services.agent_service import create as create_agent
+from services.agent_service import delete as delete_agent
 from services.llm.base import (
     ChatResult,
     EmbedResult,
     ProviderAuthError,
     ProviderServiceError,
 )
-from services.agent_rag_service import _FALLBACK_SYSTEM_PROMPT, chat as rag_chat
-from services.agent_service import create as create_agent
-from services.agent_service import delete as delete_agent
 from services.message_service import create as create_message
 from services.message_service import list_for_agent
 from services.project_service import create as create_project
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -344,8 +344,9 @@ async def test_delete_agent_removes_its_messages(db_session):
 
     await delete_agent(db_session, agent.id)
 
-    from db.models.message import Message
     from sqlalchemy import select
+
+    from db.models.message import Message
 
     result = await db_session.execute(
         select(Message).where(Message.agent_id == agent.id)

@@ -2,8 +2,9 @@
 Tests for OpenAI provider implementations (chat + embedding).
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from services.llm.base import (
     ChatResult,
