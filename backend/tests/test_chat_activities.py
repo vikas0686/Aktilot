@@ -128,7 +128,9 @@ async def test_extract_keywords_auth_error_raises_non_retryable():
 
 
 async def test_extract_keywords_rate_limit_raises_retryable():
-    factory = _mock_chat_provider(side_effect=ProviderServiceError("Rate limit", reason="rate_limit"))
+    factory = _mock_chat_provider(
+        side_effect=ProviderServiceError("Rate limit", reason="rate_limit")
+    )
     with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(extract_keywords, "test?")
@@ -234,7 +236,9 @@ async def test_generate_answer_auth_error_raises_non_retryable():
 
 
 async def test_generate_answer_rate_limit_raises_retryable():
-    factory = _mock_chat_provider(side_effect=ProviderServiceError("Rate limit", reason="rate_limit"))
+    factory = _mock_chat_provider(
+        side_effect=ProviderServiceError("Rate limit", reason="rate_limit")
+    )
     with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         with pytest.raises(ApplicationError) as exc:
             await _env.run(generate_answer, "?", "ctx", "sys")
