@@ -119,7 +119,9 @@ async def extract_keywords(question: str) -> list[str]:
     latency_ms = (time.perf_counter() - t0) * 1000
 
     # LLM metrics
-    m.llm_request_latency.record(latency_ms, {**attrs, "finish_reason": result.finish_reason})
+    m.llm_request_latency.record(
+        latency_ms, {**attrs, "finish_reason": result.finish_reason}
+    )
     m.llm_tokens_input.record(result.prompt_tokens, attrs)
     m.llm_tokens_output.record(result.completion_tokens, attrs)
     m.llm_tokens_total.record(result.total_tokens, attrs)

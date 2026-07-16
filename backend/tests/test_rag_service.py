@@ -18,7 +18,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from services.llm.base import ChatResult, EmbedResult, ProviderAuthError, ProviderServiceError
+from services.llm.base import (
+    ChatResult,
+    EmbedResult,
+    ProviderAuthError,
+    ProviderServiceError,
+)
 from services.agent_rag_service import _FALLBACK_SYSTEM_PROMPT, chat as rag_chat
 from services.agent_service import create as create_agent
 from services.agent_service import delete as delete_agent
@@ -68,7 +73,9 @@ def _mock_providers(chat_side_effect=None, embed_return=None):
     chat_provider.generate = AsyncMock(side_effect=chat_side_effect)
 
     embed_provider = MagicMock()
-    embed_provider.embed = AsyncMock(return_value=embed_return or _embed_result(FAKE_VECTOR))
+    embed_provider.embed = AsyncMock(
+        return_value=embed_return or _embed_result(FAKE_VECTOR)
+    )
 
     chat_factory = MagicMock(return_value=chat_provider)
     embed_factory = MagicMock(return_value=embed_provider)
@@ -99,9 +106,16 @@ async def _setup(
 async def test_chat_returns_chat_response(db_session):
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, chat_prov = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps(["invoice", "total"])), _chat_result("$500.")],
+        chat_side_effect=[
+            _chat_result(json.dumps(["invoice", "total"])),
+            _chat_result("$500."),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "What is the invoice total?")
 
     assert result.answer == "$500."
@@ -113,9 +127,16 @@ async def test_chat_returns_chat_response(db_session):
 async def test_chat_pipeline_step_names(db_session):
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps(["invoice"])), _chat_result("Answer.")],
+        chat_side_effect=[
+            _chat_result(json.dumps(["invoice"])),
+            _chat_result("Answer."),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "What?")
 
     step_names = [s.name for s in result.tool_steps]
@@ -136,7 +157,11 @@ async def test_chat_vec_score_is_one_minus_distance(db_session):
     chat_patch, embed_patch, _ = _mock_providers(
         chat_side_effect=[_chat_result(json.dumps(["invoice"])), _chat_result("x")],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "What?")
 
     # chunk-1: distance=0.1  → vec_score = round(1.0 - 0.1, 4) = 0.9
@@ -151,7 +176,11 @@ async def test_chat_final_score_is_hybrid(db_session):
     chat_patch, embed_patch, _ = _mock_providers(
         chat_side_effect=[_chat_result(json.dumps(["invoice"])), _chat_result("x")],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "What?")
 
     for chunk in result.retrieved_chunks:
@@ -165,9 +194,16 @@ async def test_chat_higher_vec_score_ranks_first(db_session):
     # as long as chunk-1 vec+bm25 > chunk-2 vec+bm25
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps(["invoice", "total"])), _chat_result("x")],
+        chat_side_effect=[
+            _chat_result(json.dumps(["invoice", "total"])),
+            _chat_result("x"),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "invoice total?")
 
     assert result.retrieved_chunks[0].chunk_id == "chunk-1"
@@ -178,7 +214,11 @@ async def test_chat_top_k_limits_returned_chunks(db_session):
     chat_patch, embed_patch, _ = _mock_providers(
         chat_side_effect=[_chat_result(json.dumps(["x"])), _chat_result("y")],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         result = await rag_chat(db_session, agent.id, "?")
 
     assert len(result.retrieved_chunks) == 1  # top_k=1
@@ -191,9 +231,16 @@ async def test_chat_keyword_json_parse_fallback(db_session):
     """When provider returns invalid JSON for keywords, fall back to question.split()."""
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=[_chat_result("not valid json at all"), _chat_result("no results")],
+        chat_side_effect=[
+            _chat_result("not valid json at all"),
+            _chat_result("no results"),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=[]):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=[]),
+    ):
         result = await rag_chat(db_session, agent.id, "find invoice")
 
     # Fallback: question.lower().split()
@@ -204,9 +251,16 @@ async def test_chat_empty_chroma_results(db_session):
     """With no vectors in the collection, retrieved_chunks is empty."""
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps(["nothing"])), _chat_result("I could not find that.")],
+        chat_side_effect=[
+            _chat_result(json.dumps(["nothing"])),
+            _chat_result("I could not find that."),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=[]):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=[]),
+    ):
         result = await rag_chat(db_session, agent.id, "nothing?")
 
     assert result.retrieved_chunks == []
@@ -217,9 +271,16 @@ async def test_chat_uses_fallback_system_prompt_when_blank(db_session):
     """An agent with an empty system_prompt should use _FALLBACK_SYSTEM_PROMPT."""
     _, agent = await _setup(db_session, system_prompt="")
     chat_patch, embed_patch, chat_prov = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps([])), _chat_result("fallback answer")],
+        chat_side_effect=[
+            _chat_result(json.dumps([])),
+            _chat_result("fallback answer"),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=[]):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=[]),
+    ):
         await rag_chat(db_session, agent.id, "hello?")
 
     # The second call to generate (step 5) passes the system message
@@ -235,9 +296,16 @@ async def test_chat_persists_user_and_assistant_messages(db_session):
     """A successful chat must save exactly two messages: user then assistant."""
     _, agent = await _setup(db_session)
     chat_patch, embed_patch, _ = _mock_providers(
-        chat_side_effect=[_chat_result(json.dumps(["invoice"])), _chat_result("The total is $500.")],
+        chat_side_effect=[
+            _chat_result(json.dumps(["invoice"])),
+            _chat_result("The total is $500."),
+        ],
     )
-    with chat_patch, embed_patch, patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS):
+    with (
+        chat_patch,
+        embed_patch,
+        patch("services.agent_rag_service.chroma_search", return_value=FAKE_CHUNKS),
+    ):
         await rag_chat(db_session, agent.id, "What is the invoice total?")
 
     messages = await list_for_agent(db_session, agent.id)

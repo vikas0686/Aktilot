@@ -15,7 +15,12 @@ import pytest
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
 
-from services.llm.base import ChatResult, EmbedResult, ProviderAuthError, ProviderServiceError
+from services.llm.base import (
+    ChatResult,
+    EmbedResult,
+    ProviderAuthError,
+    ProviderServiceError,
+)
 from temporal.activities.chat_activities import (
     embed_query,
     extract_keywords,
@@ -95,7 +100,9 @@ def _mock_db_factory(agent=None):
 
 
 async def test_extract_keywords_returns_list():
-    factory = _mock_chat_provider(return_value=_chat_result(json.dumps(["invoice", "total"])))
+    factory = _mock_chat_provider(
+        return_value=_chat_result(json.dumps(["invoice", "total"]))
+    )
     with patch("temporal.activities.chat_activities.get_chat_provider", factory):
         result = await _env.run(extract_keywords, "What is the invoice total?")
 

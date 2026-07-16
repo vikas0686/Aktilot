@@ -1,6 +1,11 @@
 from openai import AsyncOpenAI, AuthenticationError, RateLimitError
 
-from services.llm.base import ChatResult, EmbedResult, ProviderAuthError, ProviderServiceError
+from services.llm.base import (
+    ChatResult,
+    EmbedResult,
+    ProviderAuthError,
+    ProviderServiceError,
+)
 
 
 class OpenAIChatProvider:

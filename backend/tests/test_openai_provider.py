@@ -14,7 +14,9 @@ from services.llm.base import (
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
 
 
-def mocked_chat_response(content="Hello world", prompt_tokens=10, completion_tokens=5, finish_reason="stop"):
+def mocked_chat_response(
+    content="Hello world", prompt_tokens=10, completion_tokens=5, finish_reason="stop"
+):
     response = MagicMock()
     response.choices = [MagicMock()]
     response.choices[0].message.content = content
@@ -23,6 +25,7 @@ def mocked_chat_response(content="Hello world", prompt_tokens=10, completion_tok
     response.usage.completion_tokens = completion_tokens
     response.usage.total_tokens = prompt_tokens + completion_tokens
     return response
+
 
 class TestOpenAIChatProvider:
     @pytest.mark.asyncio
@@ -134,13 +137,15 @@ def mocked_embed_response(embeddings=None, total_tokens=8):
     response.usage.total_tokens = total_tokens
     return response
 
-class TestOpenAIEmbeddingProvider:
 
+class TestOpenAIEmbeddingProvider:
     @pytest.mark.asyncio
     async def test_embed_returns_embed_result(self):
         provider = OpenAIEmbeddingProvider(api_key="test-key")
 
-        provider._client.embeddings.create = AsyncMock(return_value=mocked_embed_response())
+        provider._client.embeddings.create = AsyncMock(
+            return_value=mocked_embed_response()
+        )
 
         result = await provider.embed(
             model="text-embedding-3-small",
@@ -155,7 +160,9 @@ class TestOpenAIEmbeddingProvider:
     async def test_embed_passes_model_and_text(self):
         provider = OpenAIEmbeddingProvider(api_key="test-key")
 
-        provider._client.embeddings.create = AsyncMock(return_value=mocked_embed_response())
+        provider._client.embeddings.create = AsyncMock(
+            return_value=mocked_embed_response()
+        )
 
         await provider.embed(
             model="text-embedding-3-small",

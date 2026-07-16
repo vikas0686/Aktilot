@@ -8,6 +8,7 @@ from unittest.mock import patch
 from services.llm.base import ProviderNotAvailableError
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
 
+
 class TestProviderFactory:
     @patch("services.llm.settings.llm_provider", "openai")
     @patch("services.llm.settings.openai_api_key", "test-key")
