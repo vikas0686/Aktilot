@@ -28,7 +28,7 @@ from db.models.file import File
 from db.session import AsyncSessionFactory
 from observability import metrics as m
 from services.llm import get_embedding_provider
-from services.llm.base import ProviderAuthError
+from services.llm.base import ProviderAuthError, ProviderNotAvailableError
 from services.project_chunk_service import _read_file, _split_text
 from vectorstore.chroma_store import add_chunks
 from vectorstore.chroma_store import delete_file as chroma_delete_file
@@ -128,6 +128,11 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
     except ProviderAuthError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(str(exc), non_retryable=True) from exc
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), non_retryable=True) from exc
 

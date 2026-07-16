@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from services.llm.base import ProviderNotAvailableError
+from services.llm.base import ProviderAuthError, ProviderNotAvailableError
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
 
 
@@ -31,7 +31,7 @@ class TestProviderFactory:
     def test_get_chat_provider_raises_when_api_key_missing(self):
         from services.llm import get_chat_provider
 
-        with pytest.raises(ProviderNotAvailableError, match="OPENAI_API_KEY"):
+        with pytest.raises(ProviderAuthError, match="OPENAI_API_KEY"):
             get_chat_provider()
 
     @patch("services.llm.settings.embedding_provider", "openai")
@@ -51,10 +51,10 @@ class TestProviderFactory:
         ):
             get_embedding_provider()
 
-    @patch("services.llm.settings.llm_provider", "openai")
+    @patch("services.llm.settings.embedding_provider", "openai")
     @patch("services.llm.settings.openai_api_key", "")
     def test_get_embedding_provider_raises_when_api_key_missing(self):
         from services.llm import get_embedding_provider
 
-        with pytest.raises(ProviderNotAvailableError, match="OPENAI_API_KEY"):
+        with pytest.raises(ProviderAuthError, match="OPENAI_API_KEY"):
             get_embedding_provider()

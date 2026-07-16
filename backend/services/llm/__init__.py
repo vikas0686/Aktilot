@@ -2,6 +2,7 @@ from config import settings
 from services.llm.base import (
     ChatProvider,
     EmbeddingProvider,
+    ProviderAuthError,
     ProviderNotAvailableError,
 )
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
@@ -12,7 +13,7 @@ def get_chat_provider(provider: str | None = None) -> ChatProvider:
 
     if name == "openai":
         if not settings.openai_api_key:
-            raise ProviderNotAvailableError("OPENAI_API_KEY is not set")
+            raise ProviderAuthError("OPENAI_API_KEY is not set")
         return OpenAIChatProvider(api_key=settings.openai_api_key)
 
     raise ProviderNotAvailableError(f"Unknown chat provider: {name}")
@@ -23,7 +24,7 @@ def get_embedding_provider(provider: str | None = None) -> EmbeddingProvider:
 
     if name == "openai":
         if not settings.openai_api_key:
-            raise ProviderNotAvailableError("OPENAI_API_KEY is not set")
+            raise ProviderAuthError("OPENAI_API_KEY is not set")
         return OpenAIEmbeddingProvider(api_key=settings.openai_api_key)
 
     raise ProviderNotAvailableError(f"Unknown embedding provider: {name}")

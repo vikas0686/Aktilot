@@ -10,7 +10,11 @@ from config import settings
 from models.schemas import ChatResponse, RetrievedChunk, ToolStep
 from services.agent_service import get as get_agent
 from services.llm import get_chat_provider, get_embedding_provider
-from services.llm.base import ProviderAuthError, ProviderServiceError
+from services.llm.base import (
+    ProviderAuthError,
+    ProviderNotAvailableError,
+    ProviderServiceError,
+)
 from services.message_service import create as create_message
 from vectorstore.chroma_store import search as chroma_search
 
@@ -168,6 +172,10 @@ async def chat(db: AsyncSession, agent_id: uuid.UUID, question: str) -> ChatResp
     except ProviderAuthError:
         raise HTTPException(
             401, "Invalid API key. Check your provider API key in .env."
+        )
+    except ProviderNotAvailableError:
+        raise HTTPException(
+            503, "LLM provider is not configured. Check LLM_PROVIDER in .env."
         )
     except ProviderServiceError:
         raise HTTPException(429, "Provider rate limit exceeded. Try again shortly.")

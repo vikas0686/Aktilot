@@ -27,7 +27,11 @@ from db.session import AsyncSessionFactory
 from observability import metrics as m
 from services import session_service
 from services.llm import get_chat_provider, get_embedding_provider
-from services.llm.base import ProviderAuthError, ProviderServiceError
+from services.llm.base import (
+    ProviderAuthError,
+    ProviderNotAvailableError,
+    ProviderServiceError,
+)
 from services.message_service import create as create_message
 from vectorstore.chroma_store import search as chroma_search
 
@@ -110,6 +114,13 @@ async def extract_keywords(question: str) -> list[str]:
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
     except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
@@ -170,6 +181,13 @@ async def embed_query(question: str) -> list[float]:
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
     except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
@@ -380,6 +398,13 @@ async def generate_answer(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
     except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
