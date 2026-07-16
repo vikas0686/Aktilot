@@ -19,6 +19,11 @@ class ChatSession(Base):
         nullable=False,
     )
     title: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    # Anonymous per-browser identity for public share-link chats. NULL for
+    # sessions created through the authenticated admin app.
+    visitor_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.UUID(as_uuid=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

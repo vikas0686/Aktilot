@@ -27,6 +27,15 @@ class Agent(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    # Public share link: NULL means sharing is disabled for this agent.
+    share_slug: Mapped[str | None] = mapped_column(
+        sa.String(64), unique=True, nullable=True, index=True
+    )
+    # Hard daily cap on visitor-originated messages while share_slug is set.
+    share_daily_message_cap: Mapped[int | None] = mapped_column(
+        sa.Integer, nullable=True
+    )
+
     project: Mapped["Project"] = relationship("Project", back_populates="agents")  # noqa: F821
     messages: Mapped[list["Message"]] = relationship(  # noqa: F821
         "Message", back_populates="agent", cascade="all, delete-orphan"
