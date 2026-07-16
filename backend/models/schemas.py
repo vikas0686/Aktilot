@@ -109,6 +109,32 @@ class AgentResponse(BaseModel):
     system_prompt: str
     top_k: int
     created_at: datetime
+    share_slug: str | None = None
+    share_daily_message_cap: int | None = None
+
+
+# ── Agent Share Links ─────────────────────────────────────────────────────────
+
+
+class ShareLinkCreate(BaseModel):
+    daily_message_cap: int | None = None
+
+
+class ShareLinkResponse(BaseModel):
+    share_slug: str
+    share_path: str
+    daily_message_cap: int | None
+
+
+class PublicAgentResponse(BaseModel):
+    """Everything a shared-link visitor is allowed to know about the agent.
+
+    Deliberately excludes project_id, system_prompt, top_k, and anything
+    else that would reveal the parent project or how the agent is configured.
+    """
+
+    name: str
+    description: str | None
 
 
 # ── Chat Sessions ─────────────────────────────────────────────────────────────
