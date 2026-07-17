@@ -20,13 +20,27 @@ export function ShareAgentModal({
     agent.share_daily_message_cap ? String(agent.share_daily_message_cap) : ""
   );
   const [copied, setCopied] = useState(false);
+  const [capError, setCapError] = useState<string | null>(null);
 
   const isShared = !!agent.share_slug;
   const shareUrl = isShared ? `${window.location.origin}/share/${agent.share_slug}` : "";
 
   const handleGenerate = () => {
-    const cap = dailyCap.trim() ? Math.max(1, Number(dailyCap)) : undefined;
-    generate.mutate({ agentId: agent.id, dailyMessageCap: cap });
+    const trimmed = dailyCap.trim();
+    if (!trimmed) {
+      setCapError(null);
+      generate.mutate({ agentId: agent.id, dailyMessageCap: undefined });
+      return;
+    }
+
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+      setCapError("Enter a whole number for the daily limit.");
+      return;
+    }
+
+    setCapError(null);
+    generate.mutate({ agentId: agent.id, dailyMessageCap: Math.max(1, parsed) });
   };
 
   const handleCopy = async () => {
@@ -91,8 +105,12 @@ export function ShareAgentModal({
               className="w-32 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder="200"
               value={dailyCap}
-              onChange={(e) => setDailyCap(e.target.value)}
+              onChange={(e) => {
+                setDailyCap(e.target.value);
+                setCapError(null);
+              }}
             />
+            {capError && <p className="text-xs text-destructive">{capError}</p>}
           </div>
 
           {isShared && (

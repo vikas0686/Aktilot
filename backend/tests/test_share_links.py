@@ -77,6 +77,18 @@ async def test_generate_share_link_honors_custom_daily_cap(client):
     assert r.json()["daily_message_cap"] == 5
 
 
+async def test_generate_share_link_rejects_non_positive_daily_cap(client):
+    """A cap of 0 must be rejected outright, not silently swapped for the
+    default — a caller who explicitly asks for 0 almost certainly made a
+    mistake, and treating it as "use the default" would hide that."""
+    _, aid = await _make_agent(client)
+    for bad_cap in (0, -1):
+        r = await client.post(
+            f"/api/agents/{aid}/share", json={"daily_message_cap": bad_cap}
+        )
+        assert r.status_code == 422
+
+
 async def test_regenerate_share_link_invalidates_old_slug(client):
     _, aid = await _make_agent(client)
     old_slug = await _share(client, aid)
@@ -273,6 +285,31 @@ async def test_public_chat_daily_agent_cap_returns_429(client, db_session):
             json={"question": "one more", "session_id": sid},
         )
     assert r.status_code == 429
+
+
+async def test_reserve_daily_share_slot_blocks_once_cap_reached(client, db_session):
+    """Two callers racing for the last slot must not both be admitted — the
+    guarded UPDATE in reserve_daily_share_slot has to serialize them, unlike a
+    plain COUNT-then-decide check which both could pass concurrently."""
+    _, aid = await _make_agent(client)
+    window_start = datetime.now(timezone.utc) - timedelta(days=1)
+
+    first = await session_service.reserve_daily_share_slot(
+        db_session, uuid.UUID(aid), window_start, daily_cap=1
+    )
+    second = await session_service.reserve_daily_share_slot(
+        db_session, uuid.UUID(aid), window_start, daily_cap=1
+    )
+    assert first is True
+    assert second is False
+
+    # Releasing the failed request's non-reservation is a no-op in effect,
+    # but releasing the successful one frees the slot back up.
+    await session_service.release_daily_share_slot(db_session, uuid.UUID(aid))
+    third = await session_service.reserve_daily_share_slot(
+        db_session, uuid.UUID(aid), window_start, daily_cap=1
+    )
+    assert third is True
 
 
 async def test_regenerating_link_resets_daily_cap_window(client, db_session):

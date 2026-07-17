@@ -4,9 +4,11 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
+from db.models.agent import Agent
 from db.models.chat_session import ChatSession
 from db.models.message import Message
 
@@ -119,6 +121,57 @@ async def count_agent_visitor_messages_since(
         )
     )
     return result.scalar_one()
+
+
+async def reserve_daily_share_slot(
+    db: AsyncSession, agent_id: uuid.UUID, window_start: datetime, daily_cap: int
+) -> bool:
+    """Atomically claim one slot against the agent's rolling daily visitor-message
+    cap, before the caller starts the (slow) chat workflow.
+
+    A plain "COUNT then decide" check has a race: concurrent requests can all
+    read a count below the cap before any of their messages are persisted,
+    letting them all through. This folds the same count (mirroring
+    count_agent_visitor_messages_since) into the WHERE clause of a guarded
+    UPDATE instead: the UPDATE takes a row lock on the agent, so a second
+    concurrent reservation blocks until the first commits, then re-evaluates
+    the count against the now-updated reserved total. Returns False if the
+    cap has already been reached.
+    """
+    persisted_count = (
+        select(func.count(Message.id))
+        .join(ChatSession, Message.session_id == ChatSession.id)
+        .where(
+            ChatSession.agent_id == agent_id,
+            ChatSession.visitor_id.is_not(None),
+            Message.role == "user",
+            Message.created_at >= window_start,
+        )
+        .scalar_subquery()
+    )
+    result = await db.execute(
+        sa_update(Agent)
+        .where(
+            Agent.id == agent_id,
+            Agent.share_daily_reserved_count + persisted_count < daily_cap,
+        )
+        .values(share_daily_reserved_count=Agent.share_daily_reserved_count + 1)
+        .returning(Agent.id)
+    )
+    claimed = result.scalar_one_or_none() is not None
+    await db.commit()
+    return claimed
+
+
+async def release_daily_share_slot(db: AsyncSession, agent_id: uuid.UUID) -> None:
+    """Release a reservation from reserve_daily_share_slot, once the request
+    that claimed it has either persisted its message or failed."""
+    await db.execute(
+        sa_update(Agent)
+        .where(Agent.id == agent_id)
+        .values(share_daily_reserved_count=Agent.share_daily_reserved_count - 1)
+    )
+    await db.commit()
 
 
 async def purge_expired_visitor_sessions(

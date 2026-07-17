@@ -54,6 +54,41 @@ function InvalidLinkScreen() {
   );
 }
 
+function RetryableErrorScreen({
+  title = "Couldn't start a chat",
+  description = "Something went wrong setting up your conversation.",
+  onRetry,
+}: {
+  title?: string;
+  description?: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-background px-4">
+      <EmptyState
+        icon={Bot}
+        title={title}
+        description={description}
+        action={
+          <button
+            onClick={onRetry}
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Try again
+          </button>
+        }
+      />
+    </div>
+  );
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    isAxiosError(error) &&
+    (error.response?.status === 404 || error.response?.status === 410)
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function PublicChatPage() {
@@ -61,17 +96,24 @@ export function PublicChatPage() {
   const navigate = useNavigate();
   const { dark, toggle } = useDarkMode();
 
-  const { data: agent, isError: agentError, isLoading: agentLoading } = usePublicAgent(slug!);
+  const {
+    data: agent,
+    isError: agentError,
+    error: agentErrorObj,
+    isLoading: agentLoading,
+    refetch: refetchAgent,
+  } = usePublicAgent(slug!);
   const { data: sessions, isLoading: sessionsLoading } = usePublicSessions(slug!);
   const createSession = useCreatePublicSession(slug!);
   const { data: history, isLoading: historyLoading } = usePublicSessionMessages(
     slug!,
     sessionId
   );
-  const send = useSendPublicMessage(slug!, sessionId);
+  const send = useSendPublicMessage(slug!);
 
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [input, setInput] = useState("");
+  const [initError, setInitError] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const historyLoaded = useRef(false);
   const resolvingSession = useRef(false);
@@ -84,7 +126,8 @@ export function PublicChatPage() {
       sessionId ||
       sessionsLoading ||
       !sessions ||
-      resolvingSession.current
+      resolvingSession.current ||
+      initError
     )
       return;
 
@@ -96,12 +139,24 @@ export function PublicChatPage() {
         onSuccess: (session) => {
           navigate(`/share/${slug}/${session.id}`, { replace: true });
         },
+        onError: () => {
+          setInitError(true);
+        },
         onSettled: () => {
           resolvingSession.current = false;
         },
       });
     }
-  }, [agent, sessionId, sessionsLoading, sessions, slug, navigate, createSession]);
+  }, [
+    agent,
+    sessionId,
+    sessionsLoading,
+    sessions,
+    slug,
+    navigate,
+    createSession,
+    initError,
+  ]);
 
   // Reset everything when switching to a different session
   useEffect(() => {
@@ -129,20 +184,23 @@ export function PublicChatPage() {
     setInput("");
     setLocalMessages((prev) => [...prev, { role: "user", content: q }]);
 
-    send.mutate(q, {
-      onSuccess: (data) => {
-        setLocalMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: data.answer, response: data },
-        ]);
-      },
-      onError: (error) => {
-        setLocalMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: extractErrorMessage(error) },
-        ]);
-      },
-    });
+    send.mutate(
+      { sessionId, question: q },
+      {
+        onSuccess: (data) => {
+          setLocalMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: data.answer, response: data },
+          ]);
+        },
+        onError: (error) => {
+          setLocalMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: extractErrorMessage(error) },
+          ]);
+        },
+      }
+    );
   };
 
   if (agentLoading) {
@@ -155,8 +213,22 @@ export function PublicChatPage() {
     );
   }
 
+  if (agentError && !isNotFoundError(agentErrorObj)) {
+    return (
+      <RetryableErrorScreen
+        title="Couldn't load this chat"
+        description="Something went wrong loading this agent."
+        onRetry={() => refetchAgent()}
+      />
+    );
+  }
+
   if (agentError || !agent) {
     return <InvalidLinkScreen />;
+  }
+
+  if (initError) {
+    return <RetryableErrorScreen onRetry={() => setInitError(false)} />;
   }
 
   const isResolvingSession = !sessionId;

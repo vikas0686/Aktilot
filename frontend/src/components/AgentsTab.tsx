@@ -175,12 +175,12 @@ function AgentCard({
             </div>
             <span className="truncate text-sm font-medium">{agent.name}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <button
               onClick={() => setSharing(true)}
               title="Share agent"
               className={cn(
-                "rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 agent.share_slug && "text-primary"
               )}
             >

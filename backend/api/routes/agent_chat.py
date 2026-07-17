@@ -83,7 +83,7 @@ async def chat(
     # Pre-flight: verify agent exists before dispatching to Temporal
     await agent_service.get(db, agent_id)
     session = await session_service.get(db, body.session_id)
-    if session.agent_id != agent_id:
+    if session.agent_id != agent_id or session.visitor_id is not None:
         raise HTTPException(404, "Chat session not found for this agent")
 
     return await run_chat_workflow(agent_id, body.session_id, body.question)

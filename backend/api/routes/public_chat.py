@@ -115,13 +115,18 @@ async def public_chat(
             # Cap was (re)generated more recently than the rolling 24h window —
             # don't count usage from before that point against the new cap.
             daily_window_start = reset_at
-    daily_count = await session_service.count_agent_visitor_messages_since(
-        db, agent.id, daily_window_start
+    reserved = await session_service.reserve_daily_share_slot(
+        db, agent.id, daily_window_start, daily_cap
     )
-    if daily_count >= daily_cap:
+    if not reserved:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "This agent has reached its usage limit for today. Please try again later.",
         )
 
-    return await run_chat_workflow(agent.id, session.id, body.question)
+    try:
+        return await run_chat_workflow(agent.id, session.id, body.question)
+    finally:
+        # Release the reservation whether the workflow succeeded (its message
+        # is now persisted and counted for real) or failed (nothing to count).
+        await session_service.release_daily_share_slot(db, agent.id)

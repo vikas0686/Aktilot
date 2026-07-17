@@ -183,16 +183,14 @@ export function usePublicSessionMessages(slug: string, sessionId: string | undef
   });
 }
 
-export function useSendPublicMessage(slug: string, sessionId: string | undefined) {
+export function useSendPublicMessage(slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (question: string) =>
-      publicChatApi.send(slug, sessionId!, question).then((r) => r.data),
-    onSuccess: () => {
+    mutationFn: ({ sessionId, question }: { sessionId: string; question: string }) =>
+      publicChatApi.send(slug, sessionId, question).then((r) => r.data),
+    onSuccess: (_data, { sessionId }) => {
       qc.invalidateQueries({ queryKey: publicSessionsKey(slug) });
-      if (sessionId) {
-        qc.invalidateQueries({ queryKey: publicSessionMessagesKey(slug, sessionId) });
-      }
+      qc.invalidateQueries({ queryKey: publicSessionMessagesKey(slug, sessionId) });
     },
   });
 }

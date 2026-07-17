@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ToolStep(BaseModel):
@@ -117,7 +117,7 @@ class AgentResponse(BaseModel):
 
 
 class ShareLinkCreate(BaseModel):
-    daily_message_cap: int | None = None
+    daily_message_cap: int | None = Field(default=None, gt=0)
 
 
 class ShareLinkResponse(BaseModel):

@@ -739,12 +739,15 @@ describe("useSendPublicMessage", () => {
     const response = { answer: "42", tool_steps: [], retrieved_chunks: [], keywords: [] };
     vi.mocked(publicChatApi.send).mockResolvedValue({ data: response } as any);
 
-    const { result } = renderHook(() => useSendPublicMessage("abc123", "s1"), {
+    const { result } = renderHook(() => useSendPublicMessage("abc123"), {
       wrapper: makeWrapper(),
     });
     let returned: any;
     await act(async () => {
-      returned = await result.current.mutateAsync("What is the total?");
+      returned = await result.current.mutateAsync({
+        sessionId: "s1",
+        question: "What is the total?",
+      });
     });
 
     expect(publicChatApi.send).toHaveBeenCalledWith("abc123", "s1", "What is the total?");
@@ -754,12 +757,12 @@ describe("useSendPublicMessage", () => {
   it("surfaces rate-limit errors from send", async () => {
     vi.mocked(publicChatApi.send).mockRejectedValue(new Error("Too Many Requests"));
 
-    const { result } = renderHook(() => useSendPublicMessage("abc123", "s1"), {
+    const { result } = renderHook(() => useSendPublicMessage("abc123"), {
       wrapper: makeWrapper(),
     });
 
     act(() => {
-      result.current.mutate("?");
+      result.current.mutate({ sessionId: "s1", question: "?" });
     });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error).toBeInstanceOf(Error);
