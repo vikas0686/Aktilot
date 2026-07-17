@@ -34,24 +34,42 @@ vi.mock("@/services/api", () => ({
   filesApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn() },
   chunksApi: { chunk: vi.fn(), stats: vi.fn() },
   chatApi: { send: vi.fn() },
+  shareApi: {
+    generate: vi.fn(),
+    revoke: vi.fn(),
+  },
+  publicChatApi: {
+    getAgent: vi.fn(),
+    listSessions: vi.fn(),
+    createSession: vi.fn(),
+    sessionMessages: vi.fn(),
+    send: vi.fn(),
+  },
 }));
 
-import { agentChatApi, agentsApi, chatSessionsApi, projectFilesApi, projectsApi } from "@/services/api";
+import { agentChatApi, agentsApi, chatSessionsApi, projectFilesApi, projectsApi, shareApi, publicChatApi } from "@/services/api";
 import {
   useAgent,
   useAgentSessions,
   useCreateAgent,
   useCreateChatSession,
   useCreateProject,
+  useCreatePublicSession,
   useDeleteAgent,
   useDeleteProject,
   useDeleteProjectFile,
+  useGenerateShareLink,
   useProject,
   useProjectAgents,
   useProjectFiles,
   useProjects,
+  usePublicAgent,
+  usePublicSessionMessages,
+  usePublicSessions,
+  useRevokeShareLink,
   useSessionMessages,
   useSendAgentMessage,
+  useSendPublicMessage,
   useUpdateAgent,
   useUploadProjectFile,
 } from "@/hooks/useApi";
@@ -606,5 +624,147 @@ describe("useSendAgentMessage", () => {
     });
 
     await waitFor(() => expect(messagesResult.current.data).toEqual(after));
+  });
+});
+
+// ── useGenerateShareLink / useRevokeShareLink ─────────────────────────────────
+
+describe("useGenerateShareLink", () => {
+  it("generates a share link with the given daily cap", async () => {
+    const link = { share_slug: "abc123", share_path: "/share/abc123", daily_message_cap: 50 };
+    vi.mocked(shareApi.generate).mockResolvedValue({ data: link } as any);
+
+    const { result } = renderHook(() => useGenerateShareLink("p1"), { wrapper: makeWrapper() });
+    let returned: any;
+    await act(async () => {
+      returned = await result.current.mutateAsync({ agentId: "a1", dailyMessageCap: 50 });
+    });
+
+    expect(shareApi.generate).toHaveBeenCalledWith("a1", 50);
+    expect(returned).toEqual(link);
+  });
+});
+
+describe("useRevokeShareLink", () => {
+  it("revokes the share link for an agent", async () => {
+    vi.mocked(shareApi.revoke).mockResolvedValue({} as any);
+
+    const { result } = renderHook(() => useRevokeShareLink("p1"), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.mutateAsync("a1");
+    });
+
+    expect(shareApi.revoke).toHaveBeenCalledWith("a1");
+  });
+});
+
+// ── Public (shared-link) chat hooks ────────────────────────────────────────────
+
+describe("usePublicAgent", () => {
+  it("fetches the public agent view by slug", async () => {
+    const agent = { name: "Support Bot", description: "Helps customers" };
+    vi.mocked(publicChatApi.getAgent).mockResolvedValue({ data: agent } as any);
+
+    const { result } = renderHook(() => usePublicAgent("abc123"), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(agent);
+    expect(publicChatApi.getAgent).toHaveBeenCalledWith("abc123");
+  });
+
+  it("does not fetch when slug is empty", async () => {
+    const { result } = renderHook(() => usePublicAgent(""), { wrapper: makeWrapper() });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(publicChatApi.getAgent).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe("idle");
+  });
+});
+
+describe("usePublicSessions", () => {
+  it("fetches the visitor's own sessions for the shared agent", async () => {
+    const sessions = [
+      { id: "s1", agent_id: "a1", title: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" },
+    ];
+    vi.mocked(publicChatApi.listSessions).mockResolvedValue({ data: sessions } as any);
+
+    const { result } = renderHook(() => usePublicSessions("abc123"), { wrapper: makeWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(sessions);
+    expect(publicChatApi.listSessions).toHaveBeenCalledWith("abc123");
+  });
+});
+
+describe("useCreatePublicSession", () => {
+  it("creates a new visitor session for the shared agent", async () => {
+    const session = { id: "s1", agent_id: "a1", title: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z" };
+    vi.mocked(publicChatApi.createSession).mockResolvedValue({ data: session } as any);
+
+    const { result } = renderHook(() => useCreatePublicSession("abc123"), { wrapper: makeWrapper() });
+    let returned: any;
+    await act(async () => {
+      returned = await result.current.mutateAsync();
+    });
+
+    expect(publicChatApi.createSession).toHaveBeenCalledWith("abc123");
+    expect(returned).toEqual(session);
+  });
+});
+
+describe("usePublicSessionMessages", () => {
+  it("fetches messages for the visitor's session", async () => {
+    const messages = [
+      { id: "m1", agent_id: "a1", role: "user", content: "Hi", created_at: "2024-01-01T00:00:00Z" },
+    ];
+    vi.mocked(publicChatApi.sessionMessages).mockResolvedValue({ data: messages } as any);
+
+    const { result } = renderHook(() => usePublicSessionMessages("abc123", "s1"), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(messages);
+    expect(publicChatApi.sessionMessages).toHaveBeenCalledWith("abc123", "s1");
+  });
+
+  it("does not fetch when sessionId is undefined", async () => {
+    const { result } = renderHook(() => usePublicSessionMessages("abc123", undefined), {
+      wrapper: makeWrapper(),
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(publicChatApi.sessionMessages).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe("idle");
+  });
+});
+
+describe("useSendPublicMessage", () => {
+  it("calls send with slug, sessionId and question", async () => {
+    const response = { answer: "42" };
+    vi.mocked(publicChatApi.send).mockResolvedValue({ data: response } as any);
+
+    const { result } = renderHook(() => useSendPublicMessage("abc123"), {
+      wrapper: makeWrapper(),
+    });
+    let returned: any;
+    await act(async () => {
+      returned = await result.current.mutateAsync({
+        sessionId: "s1",
+        question: "What is the total?",
+      });
+    });
+
+    expect(publicChatApi.send).toHaveBeenCalledWith("abc123", "s1", "What is the total?");
+    expect(returned).toEqual(response);
+  });
+
+  it("surfaces rate-limit errors from send", async () => {
+    vi.mocked(publicChatApi.send).mockRejectedValue(new Error("Too Many Requests"));
+
+    const { result } = renderHook(() => useSendPublicMessage("abc123"), {
+      wrapper: makeWrapper(),
+    });
+
+    act(() => {
+      result.current.mutate({ sessionId: "s1", question: "?" });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });

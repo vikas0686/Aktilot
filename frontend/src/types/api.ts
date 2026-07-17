@@ -23,6 +23,19 @@ export interface Agent {
   system_prompt: string;
   top_k: number;
   created_at: string;
+  share_slug: string | null;
+  share_daily_message_cap: number | null;
+}
+
+export interface ShareLink {
+  share_slug: string;
+  share_path: string;
+  daily_message_cap: number | null;
+}
+
+export interface PublicAgent {
+  name: string;
+  description: string | null;
 }
 
 export interface AgentChatMessage {
@@ -76,6 +89,12 @@ export interface ChatResponse {
   tool_steps: ToolStep[];
   retrieved_chunks: RetrievedChunk[];
   keywords: string[];
+}
+
+// Visitor-facing share-link chat response — deliberately excludes
+// tool_steps/retrieved_chunks, which the backend never sends for this route.
+export interface PublicChatResponse {
+  answer: string;
 }
 
 export interface ChunkStats {

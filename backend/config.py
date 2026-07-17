@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -19,6 +20,12 @@ class Settings(BaseSettings):
     otel_endpoint: str = "http://localhost:4317"
     environment: str = "development"
     app_version: str = "0.1.0"
+    # public share links
+    share_visitor_cookie_name: str = "aktilot_vid"
+    share_visitor_hourly_message_cap: int = Field(default=20, gt=0)
+    share_default_daily_message_cap: int = Field(default=200, gt=0)
+    share_visitor_retention_days: int = Field(default=7, gt=0)
+    share_retention_sweep_interval_seconds: int = Field(default=3600, gt=0)
 
     model_config = {"env_file": ".env"}
 

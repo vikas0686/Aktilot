@@ -27,6 +27,28 @@ class Agent(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    # Public share link: NULL means sharing is disabled for this agent.
+    share_slug: Mapped[str | None] = mapped_column(
+        sa.String(64), unique=True, nullable=True, index=True
+    )
+    # Hard daily cap on visitor-originated messages while share_slug is set.
+    share_daily_message_cap: Mapped[int | None] = mapped_column(
+        sa.Integer, nullable=True
+    )
+    # Set every time the share link is (re)generated. The daily cap only
+    # counts messages from this point forward, so lowering the cap never
+    # retroactively blocks on usage that happened under a higher/older cap.
+    share_daily_cap_reset_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    # In-flight reservations against the daily cap — held from the moment a
+    # request passes the cap check until its message is persisted (or the
+    # request fails), so concurrent requests can't all pass the check before
+    # any of them lands a message. See session_service.reserve_daily_share_slot.
+    share_daily_reserved_count: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, default=0, server_default="0"
+    )
+
     project: Mapped["Project"] = relationship("Project", back_populates="agents")  # noqa: F821
     messages: Mapped[list["Message"]] = relationship(  # noqa: F821
         "Message", back_populates="agent", cascade="all, delete-orphan"
