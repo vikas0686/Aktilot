@@ -58,6 +58,7 @@ services:
   # ── Application Stack ──────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
+    profiles: ["ollama"]
     ports:
       - "11434:11434"
     volumes:
@@ -69,8 +70,9 @@ services:
       retries: 10
     restart: unless-stopped
 
-  ollama-init:
+  ollama-model:
     image: curlimages/curl:latest
+    profiles: ["ollama"]
     depends_on:
       ollama:
         condition: service_healthy
