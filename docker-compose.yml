@@ -56,6 +56,32 @@ services:
     restart: unless-stopped
 
   # ── Application Stack ──────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  ollama-init:
+    image: curlimages/curl:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 1; done
+        curl -s http://ollama:11434/api/pull -d '{"name": "${CHAT_MODEL:-llama3.2}"}'
+        curl -s http://ollama:11434/api/pull -d '{"name": "${EMBEDDING_MODEL:-nomic-embed-text}"}'
+    restart: "no"
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -110,6 +136,11 @@ services:
       - OTEL_ENDPOINT=http://otel-collector:4317
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - APP_VERSION=${APP_VERSION:-0.1.0}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - CHAT_MODEL=${CHAT_MODEL:-gpt-4o-mini}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
     volumes:
       - uploads_data:/app/uploads
       - chroma_data:/app/chroma_data
@@ -136,6 +167,11 @@ services:
       - OTEL_ENDPOINT=http://otel-collector:4317
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - APP_VERSION=${APP_VERSION:-0.1.0}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - CHAT_MODEL=${CHAT_MODEL:-gpt-4o-mini}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-openai}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
     volumes:
       - uploads_data:/app/uploads
       - chroma_data:/app/chroma_data
@@ -164,3 +200,4 @@ volumes:
   prometheus_data:
   tempo_data:
   grafana_data:
+  ollama_data:
