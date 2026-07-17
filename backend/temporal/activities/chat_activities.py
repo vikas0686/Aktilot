@@ -15,7 +15,6 @@ import time
 import uuid
 
 import tiktoken
-from openai import AsyncOpenAI, AuthenticationError, RateLimitError
 from rank_bm25 import BM25Okapi
 from sqlalchemy import select
 from temporalio import activity
@@ -27,10 +26,14 @@ from db.models.agent import Agent
 from db.session import AsyncSessionFactory
 from observability import metrics as m
 from services import session_service
+from services.llm import get_chat_provider, get_embedding_provider
+from services.llm.base import (
+    ProviderAuthError,
+    ProviderNotAvailableError,
+    ProviderServiceError,
+)
 from services.message_service import create as create_message
 from vectorstore.chroma_store import search as chroma_search
-
-_openai = AsyncOpenAI(api_key=settings.openai_api_key)
 
 _FALLBACK_SYSTEM_PROMPT = (
     "You are a document assistant. Use only the supplied context to answer. "
@@ -63,7 +66,7 @@ def _common_attrs(activity_name: str) -> dict:
         "rag.workflow_id": info.workflow_id,
         "rag.workflow_type": info.workflow_type,
         "rag.model": settings.chat_model,
-        "rag.provider": "openai",
+        "rag.provider": settings.llm_provider,
     }
 
 
@@ -92,7 +95,7 @@ async def extract_keywords(question: str) -> list[str]:
 
     t0 = time.perf_counter()
     try:
-        resp = await _openai.chat.completions.create(
+        result = await get_chat_provider().generate(
             model=settings.chat_model,
             messages=[
                 {
@@ -106,42 +109,49 @@ async def extract_keywords(question: str) -> list[str]:
             ],
             temperature=0,
         )
-    except AuthenticationError as exc:
+    except ProviderAuthError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
-    except RateLimitError as exc:
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
+    except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
         )
         raise ApplicationError(str(exc), type="RATE_LIMIT") from exc
 
     latency_ms = (time.perf_counter() - t0) * 1000
-    usage = resp.usage
-    finish_reason = resp.choices[0].finish_reason or "unknown"
 
     # LLM metrics
-    m.llm_request_latency.record(latency_ms, {**attrs, "finish_reason": finish_reason})
-    m.llm_tokens_input.record(usage.prompt_tokens, attrs)
-    m.llm_tokens_output.record(usage.completion_tokens, attrs)
-    m.llm_tokens_total.record(usage.total_tokens, attrs)
+    m.llm_request_latency.record(
+        latency_ms, {**attrs, "finish_reason": result.finish_reason}
+    )
+    m.llm_tokens_input.record(result.prompt_tokens, attrs)
+    m.llm_tokens_output.record(result.completion_tokens, attrs)
+    m.llm_tokens_total.record(result.total_tokens, attrs)
     if latency_ms > 0:
         m.llm_tokens_per_second.record(
-            usage.completion_tokens / (latency_ms / 1000), attrs
+            result.completion_tokens / (latency_ms / 1000), attrs
         )
-    m.llm_requests_total.add(1, {**attrs, "finish_reason": finish_reason})
+    m.llm_requests_total.add(1, {**attrs, "finish_reason": result.finish_reason})
 
     # Token cost counters
-    m.tokens_input_total.add(usage.prompt_tokens, attrs)
-    m.tokens_output_total.add(usage.completion_tokens, attrs)
-    m.requests_chat_total.add(1, {**attrs, "finish_reason": finish_reason})
+    m.tokens_input_total.add(result.prompt_tokens, attrs)
+    m.tokens_output_total.add(result.completion_tokens, attrs)
+    m.requests_chat_total.add(1, {**attrs, "finish_reason": result.finish_reason})
 
     # Retry signal
     if activity.info().attempt > 1:
         m.workflow_retries_total.add(1, {**attrs, "error_type": "RATE_LIMIT"})
 
-    raw = resp.choices[0].message.content or "[]"
+    raw = result.content or "[]"
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -154,7 +164,7 @@ async def embed_query(question: str) -> list[float]:
         "rag.activity_name": "embed_query",
         "rag.model": settings.embedding_model,
         "rag.embedding_model": settings.embedding_model,
-        "rag.provider": "openai",
+        "rag.provider": settings.embedding_provider,
         "rag.call_site": "query",
     }
     info = activity.info()
@@ -163,28 +173,35 @@ async def embed_query(question: str) -> list[float]:
 
     t0 = time.perf_counter()
     try:
-        resp = await _openai.embeddings.create(
-            model=settings.embedding_model, input=question
+        result = await get_embedding_provider().embed(
+            model=settings.embedding_model, texts=[question]
         )
-    except AuthenticationError as exc:
+    except ProviderAuthError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
-    except RateLimitError as exc:
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
+    except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
         )
         raise ApplicationError(str(exc), type="RATE_LIMIT") from exc
 
     latency_ms = (time.perf_counter() - t0) * 1000
-    vector = resp.data[0].embedding
+    vector = result.embeddings[0]
 
     m.embedding_latency.record(latency_ms, attrs)
     m.embedding_requests_total.add(1, attrs)
-    if resp.usage:
-        m.embedding_tokens_total.add(resp.usage.total_tokens, attrs)
-        m.tokens_embedding_total.add(resp.usage.total_tokens, attrs)
+    if result.total_tokens:
+        m.embedding_tokens_total.add(result.total_tokens, attrs)
+        m.tokens_embedding_total.add(result.total_tokens, attrs)
     m.requests_embedding_total.add(1, attrs)
 
     m.update_embedding_dims(settings.embedding_model, len(vector))
@@ -365,7 +382,7 @@ async def generate_answer(
     # ── LLM call ──────────────────────────────────────────────────────────────
     t0 = time.perf_counter()
     try:
-        resp = await _openai.chat.completions.create(
+        result = await get_chat_provider().generate(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -376,37 +393,42 @@ async def generate_answer(
             ],
             temperature=0.2,
         )
-    except AuthenticationError as exc:
+    except ProviderAuthError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "AUTH_ERROR", "non_retryable": "true"}
         )
         raise ApplicationError(str(exc), type="AUTH_ERROR", non_retryable=True) from exc
-    except RateLimitError as exc:
+    except ProviderNotAvailableError as exc:
+        m.workflow_activity_failures_total.add(
+            1, {**attrs, "error_type": "CONFIG_ERROR", "non_retryable": "true"}
+        )
+        raise ApplicationError(
+            str(exc), type="CONFIG_ERROR", non_retryable=True
+        ) from exc
+    except ProviderServiceError as exc:
         m.workflow_activity_failures_total.add(
             1, {**attrs, "error_type": "RATE_LIMIT", "non_retryable": "false"}
         )
         raise ApplicationError(str(exc), type="RATE_LIMIT") from exc
 
     latency_ms = (time.perf_counter() - t0) * 1000
-    usage = resp.usage
-    finish_reason = resp.choices[0].finish_reason or "unknown"
-    answer = resp.choices[0].message.content or ""
+    answer = result.content
 
     # ── LLM metrics ───────────────────────────────────────────────────────────
-    llm_attrs = {**attrs, "finish_reason": finish_reason}
+    llm_attrs = {**attrs, "finish_reason": result.finish_reason}
     m.llm_request_latency.record(latency_ms, llm_attrs)
-    m.llm_tokens_input.record(usage.prompt_tokens, llm_attrs)
-    m.llm_tokens_output.record(usage.completion_tokens, llm_attrs)
-    m.llm_tokens_total.record(usage.total_tokens, llm_attrs)
-    if latency_ms > 0 and usage.completion_tokens:
+    m.llm_tokens_input.record(result.prompt_tokens, llm_attrs)
+    m.llm_tokens_output.record(result.completion_tokens, llm_attrs)
+    m.llm_tokens_total.record(result.total_tokens, llm_attrs)
+    if latency_ms > 0 and result.completion_tokens:
         m.llm_tokens_per_second.record(
-            usage.completion_tokens / (latency_ms / 1000), attrs
+            result.completion_tokens / (latency_ms / 1000), attrs
         )
     m.llm_requests_total.add(1, llm_attrs)
 
     # ── Token cost counters ───────────────────────────────────────────────────
-    m.tokens_input_total.add(usage.prompt_tokens, attrs)
-    m.tokens_output_total.add(usage.completion_tokens, attrs)
+    m.tokens_input_total.add(result.prompt_tokens, attrs)
+    m.tokens_output_total.add(result.completion_tokens, attrs)
     m.requests_chat_total.add(1, llm_attrs)
 
     if activity.info().attempt > 1:

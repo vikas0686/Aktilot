@@ -1,11 +1,9 @@
 from pathlib import Path
 
-from openai import AsyncOpenAI
 from pypdf import PdfReader
 
 from config import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
+from services.llm import get_embedding_provider
 
 CHUNK_SIZE = 1000
 OVERLAP = 200
@@ -33,11 +31,10 @@ def _split_text(text: str) -> list[str]:
 
 
 async def _embed(texts: list[str]) -> list[list[float]]:
+    provider = get_embedding_provider()
     embeddings: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH):
         batch = texts[i : i + EMBED_BATCH]
-        resp = await client.embeddings.create(
-            model=settings.embedding_model, input=batch
-        )
-        embeddings.extend([d.embedding for d in resp.data])
+        result = await provider.embed(model=settings.embedding_model, texts=batch)
+        embeddings.extend(result.embeddings)
     return embeddings
