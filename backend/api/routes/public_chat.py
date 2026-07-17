@@ -18,10 +18,10 @@ from config import settings
 from db.session import get_db
 from models.schemas import (
     ChatRequest,
-    ChatResponse,
     ChatSessionResponse,
     MessageResponse,
     PublicAgentResponse,
+    PublicChatResponse,
 )
 from services import agent_service, message_service, session_service
 
@@ -78,7 +78,7 @@ async def get_public_session_messages(
     return await message_service.list_for_session(db, session.id)
 
 
-@router.post("/agents/{slug}/chat", response_model=ChatResponse)
+@router.post("/agents/{slug}/chat", response_model=PublicChatResponse)
 async def public_chat(
     slug: str,
     body: ChatRequest,
@@ -125,7 +125,8 @@ async def public_chat(
         )
 
     try:
-        return await run_chat_workflow(agent.id, session.id, body.question)
+        result = await run_chat_workflow(agent.id, session.id, body.question)
+        return PublicChatResponse(answer=result.answer)
     finally:
         # Release the reservation whether the workflow succeeded (its message
         # is now persisted and counted for real) or failed (nothing to count).

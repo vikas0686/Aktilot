@@ -22,12 +22,10 @@ import {
   UserBubble,
 } from "@/components/chat/ChatMessageParts";
 import { cn } from "@/lib/utils";
-import type { ChatResponse } from "@/types/api";
 
 type LocalMessage = {
   role: "user" | "assistant";
   content: string;
-  response?: ChatResponse;
 };
 
 const DEFAULT_ERROR_MESSAGE = "Something went wrong. Please try again.";
@@ -190,7 +188,7 @@ export function PublicChatPage() {
         onSuccess: (data) => {
           setLocalMessages((prev) => [
             ...prev,
-            { role: "assistant", content: data.answer, response: data },
+            { role: "assistant", content: data.answer },
           ]);
         },
         onError: (error) => {
@@ -293,7 +291,7 @@ export function PublicChatPage() {
                     m.role === "user" ? (
                       <UserBubble key={i} content={m.content} />
                     ) : (
-                      <AssistantBubble key={i} content={m.content} response={m.response} />
+                      <AssistantBubble key={i} content={m.content} />
                     )
                   )}
 

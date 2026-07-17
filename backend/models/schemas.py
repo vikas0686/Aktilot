@@ -37,6 +37,17 @@ class ChatResponse(BaseModel):
     keywords: list[str] = []  # keywords extracted from the question
 
 
+class PublicChatResponse(BaseModel):
+    """Response shape for the visitor-facing share-link chat endpoint.
+
+    Deliberately excludes tool_steps and retrieved_chunks — those carry
+    internal pipeline details and source document filenames/content that
+    must never reach an anonymous visitor.
+    """
+
+    answer: str
+
+
 # ── Projects ──────────────────────────────────────────────────────────────────
 
 

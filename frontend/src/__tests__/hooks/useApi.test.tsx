@@ -736,7 +736,7 @@ describe("usePublicSessionMessages", () => {
 
 describe("useSendPublicMessage", () => {
   it("calls send with slug, sessionId and question", async () => {
-    const response = { answer: "42", tool_steps: [], retrieved_chunks: [], keywords: [] };
+    const response = { answer: "42" };
     vi.mocked(publicChatApi.send).mockResolvedValue({ data: response } as any);
 
     const { result } = renderHook(() => useSendPublicMessage("abc123"), {

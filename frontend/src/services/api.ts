@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent } from "@/types/api";
+import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent, PublicChatResponse } from "@/types/api";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -61,7 +61,7 @@ export const publicChatApi = {
   sessionMessages: (slug: string, sessionId: string) =>
     api.get<AgentChatMessage[]>(`/public/agents/${slug}/sessions/${sessionId}/messages`),
   send: (slug: string, sessionId: string, question: string) =>
-    api.post<ChatResponse>(`/public/agents/${slug}/chat`, {
+    api.post<PublicChatResponse>(`/public/agents/${slug}/chat`, {
       question,
       session_id: sessionId,
     }),
