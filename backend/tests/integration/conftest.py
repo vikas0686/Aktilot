@@ -34,8 +34,9 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from services.llm.base import ChatResult, EmbedResult
-from temporal.activities import chat_activities
+from temporal.activities import chat_activities, document_activities
 from temporal.workflows.chat_workflow import ChatWorkflow
+from temporal.workflows.document_workflow import DocumentWorkflow
 
 pytestmark = pytest.mark.integration
 
@@ -86,7 +87,20 @@ class ScriptedProvider:
 
     async def embed(self, **kwargs) -> EmbedResult:
         self.calls.append(kwargs)
-        return self._next()
+        result = self._next()
+        # A scripted single-vector EmbedResult is a template for a successful
+        # call, not literally "one embedding regardless of input" — broadcast
+        # it across all requested texts (embed_query always asks for exactly
+        # one, so this is a no-op there; embed_and_index_chunks asks for a
+        # whole batch at once and needs one vector per text).
+        if isinstance(result, EmbedResult) and len(result.embeddings) == 1:
+            texts = kwargs.get("texts", [])
+            if len(texts) > 1:
+                return EmbedResult(
+                    embeddings=result.embeddings * len(texts),
+                    total_tokens=result.total_tokens,
+                )
+        return result
 
     def _next(self):
         if not self.responses:
@@ -211,4 +225,107 @@ async def integration_client(
 
     monkeypatch.setattr("api.routes.agent_chat.get_temporal_client", _fake_get_client)
     monkeypatch.setattr("api.routes.agent_chat.TASK_QUEUE", task_queue)
+    return client
+
+
+# ── DocumentWorkflow fixtures ──────────────────────────────────────────────────
+
+
+@pytest.fixture
+def isolated_upload_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Redirects both the upload route's on-disk file writes and
+    document_activities' chunks temp file into tmp_path — `config.settings` is
+    a shared singleton, so patching the attribute here affects every module
+    that reads `settings.upload_dir`, not just one of them."""
+    monkeypatch.setattr("config.settings.upload_dir", tmp_path)
+    return tmp_path
+
+
+@pytest.fixture
+def document_embedding_provider(monkeypatch: pytest.MonkeyPatch) -> ScriptedProvider:
+    """document_activities.py imports get_embedding_provider independently of
+    chat_activities.py — a separate module-level name needs its own patch."""
+    provider = ScriptedProvider([embed_result()])
+    monkeypatch.setattr(
+        "temporal.activities.document_activities.get_embedding_provider",
+        lambda *a, **kw: provider,
+    )
+    return provider
+
+
+@pytest.fixture
+def chroma_document_mock(monkeypatch: pytest.MonkeyPatch):
+    """Records add_chunks/chroma_delete_file calls instead of touching the
+    globally-mocked chromadb module, which can't serve realistic behavior."""
+    state = {"added": [], "deleted": []}
+
+    def _add_chunks(project_id, chunks, embeddings):
+        state["added"].append((project_id, chunks, embeddings))
+
+    def _delete_file(project_id, file_id):
+        state["deleted"].append((project_id, file_id))
+
+    monkeypatch.setattr(
+        "temporal.activities.document_activities.add_chunks", _add_chunks
+    )
+    monkeypatch.setattr(
+        "temporal.activities.document_activities.chroma_delete_file", _delete_file
+    )
+    return state
+
+
+@pytest_asyncio.fixture
+async def document_worker(
+    temporal_env: WorkflowEnvironment,
+    engine,
+    task_queue: str,
+    document_embedding_provider: ScriptedProvider,
+    chroma_document_mock: dict,
+    isolated_upload_dir,
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncGenerator[Worker, None]:
+    """A real Temporal Worker running the real DocumentWorkflow + activities,
+    with activities' DB access repointed at the test's in-memory engine."""
+    test_sessionmaker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    monkeypatch.setattr(
+        "temporal.activities.document_activities.AsyncSessionFactory", test_sessionmaker
+    )
+
+    worker = Worker(
+        temporal_env.client,
+        task_queue=task_queue,
+        workflows=[DocumentWorkflow],
+        activities=[
+            document_activities.update_file_status,
+            document_activities.read_and_split_file,
+            document_activities.clear_existing_vectors,
+            document_activities.embed_and_index_chunks,
+        ],
+    )
+    async with worker:
+        yield worker
+
+
+@pytest_asyncio.fixture
+async def document_integration_client(
+    client,
+    temporal_env: WorkflowEnvironment,
+    task_queue: str,
+    document_worker: Worker,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The shared HTTP `client` fixture, wired so uploads dispatch the REAL
+    DocumentWorkflow on the ephemeral test server instead of a stub. Note the
+    route uses start_workflow (fire-and-forget), not execute_workflow — tests
+    must separately await completion via a workflow handle."""
+
+    async def _fake_get_client() -> Client:
+        return temporal_env.client
+
+    monkeypatch.setattr(
+        "api.routes.project_files.get_temporal_client", _fake_get_client
+    )
+    monkeypatch.setattr("api.routes.project_files.TASK_QUEUE", task_queue)
     return client
