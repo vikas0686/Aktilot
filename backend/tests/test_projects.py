@@ -187,13 +187,19 @@ async def test_delete_project_removes_upload_directory_from_disk(client):
         new_callable=AsyncMock,
         return_value=mock_tc,
     ):
-        await client.post(
+        upload_resp = await client.post(
             f"/api/projects/{pid}/files/upload",
             files={"file": ("a.txt", io.BytesIO(b"content"), "text/plain")},
         )
+    assert upload_resp.status_code == 201
+    fid = upload_resp.json()["id"]
 
+    # project_upload_dir() itself mkdir()s the directory as a side effect, so
+    # asserting the directory exists alone wouldn't prove the upload actually
+    # wrote a file — check the specific uploaded file instead.
     upload_dir = project_upload_dir(pid)
-    assert upload_dir.exists()
+    dest = upload_dir / f"{fid}_a.txt"
+    assert dest.exists()
 
     with patch("services.project_service.chroma_delete_project"):
         await client.delete(f"/api/projects/{pid}")

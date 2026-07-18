@@ -240,9 +240,7 @@ async def test_get_project_uuid_with_uppercase_hex_digits_is_accepted(client):
 )
 async def test_get_project_rejects_each_malformed_uuid_shape(client, malformed):
     r = await client.get(f"/api/projects/{malformed}")
-    assert r.status_code in (404, 422), (
-        f"expected 404 or 422 for {malformed!r}, got {r.status_code}"
-    )
+    assert r.status_code == 422, f"expected 422 for {malformed!r}, got {r.status_code}"
 
 
 async def test_get_project_with_empty_id_segment_hits_the_slash_redirect_not_404(

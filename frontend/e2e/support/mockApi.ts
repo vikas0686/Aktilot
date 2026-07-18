@@ -312,12 +312,22 @@ export class ApiMock {
       return this.json(route, 201, this.createSession(agent.id, true));
     }
     if (seg[0] === "public" && seg[3] === "sessions" && seg[5] === "messages" && method === "GET") {
-      return this.json(route, 200, this.messagesFor(seg[4]));
+      const agent = this.agents.find((a) => a.share_slug === seg[2]);
+      if (!agent) return this.notFound(route);
+      const session = this.findPublicSession(agent.id, seg[4]);
+      if (!session) return this.notFound(route);
+      return this.json(route, 200, this.messagesFor(session.id));
     }
     if (seg[0] === "public" && seg[3] === "chat" && method === "POST") {
       const agent = this.agents.find((a) => a.share_slug === seg[2]);
       if (!agent) return this.notFound(route);
       const b = body();
+      // Mirrors the real backend's get_for_visitor: 404 (not some other
+      // error) on a session that doesn't exist, belongs to a different
+      // agent, or is an admin (non-visitor) session — a mismatch must never
+      // silently succeed just because *a* session with that id exists.
+      const session = this.findPublicSession(agent.id, b.session_id);
+      if (!session) return this.notFound(route);
       return this.handleChat(route, {
         agentId: agent.id,
         sessionId: b.session_id,
@@ -341,6 +351,14 @@ export class ApiMock {
     };
     this.sessions.push(session);
     return session;
+  }
+
+  /** A session usable on a public/visitor route: must exist, belong to this
+   * agent, and be visitor-owned (not an admin session). */
+  private findPublicSession(agentId: string, sessionId: string): SessionRecord | undefined {
+    return this.sessions.find(
+      (s) => s.id === sessionId && s.agent_id === agentId && s.visitor_owned
+    );
   }
 
   private messagesFor(sessionId: string) {

@@ -73,13 +73,18 @@ test("session creation failing shows a retryable error distinct from an invalid 
   const project = mock.seedProject({ name: "P" });
   const agent = mock.seedAgent(project.id, { name: "Helper", share_slug: "init-fail-slug" });
 
+  let attempt = 0;
   await page.route(`**/api/public/agents/${agent.share_slug}/sessions`, (route) => {
     if (route.request().method() === "POST") {
-      return route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: JSON.stringify({ detail: "boom" }),
-      });
+      attempt += 1;
+      if (attempt === 1) {
+        return route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "boom" }),
+        });
+      }
+      return route.fallback();
     }
     return route.fallback();
   });
@@ -87,4 +92,7 @@ test("session creation failing shows a retryable error distinct from an invalid 
   await page.goto(`/share/${agent.share_slug}`);
   await expect(page.getByText("Couldn't start a chat")).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByPlaceholder(/^Message Helper/)).toBeVisible();
 });

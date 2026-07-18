@@ -215,7 +215,8 @@ async def test_delete_file_removes_it_from_disk(client):
     assert dest.exists()
 
     with patch("services.project_file_service.chroma_delete_file"):
-        await client.delete(f"/api/projects/{pid}/files/{fid}")
+        r = await client.delete(f"/api/projects/{pid}/files/{fid}")
+    assert r.status_code == 204
 
     assert not dest.exists()
 

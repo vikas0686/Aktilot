@@ -104,7 +104,7 @@ async def test_document_workflow_small_file_produces_one_chunk(
 
 
 async def test_document_workflow_missing_file_on_disk_sets_error_status(
-    document_worker, temporal_env, task_queue, db_session
+    document_worker, temporal_env, task_queue, db_session, tmp_path
 ):
     """A File row whose file was never actually written to disk (or was
     removed) must fail non-retryably and leave the record's status as
@@ -112,11 +112,15 @@ async def test_document_workflow_missing_file_on_disk_sets_error_status(
     project_id = uuid.uuid4()
     file_id = uuid.uuid4()
     project = Project(id=project_id, name="P")
+    # Under pytest's per-test tmp_path — guaranteed not to exist since we
+    # never write to it, without relying on an assumption about the root
+    # filesystem layout.
+    missing_path = tmp_path / "ghost.txt"
     file_record = File(
         id=file_id,
         project_id=project_id,
         filename="ghost.txt",
-        filepath="/nonexistent/path/ghost.txt",
+        filepath=str(missing_path),
         size=0,
         chunk_status="pending",
     )

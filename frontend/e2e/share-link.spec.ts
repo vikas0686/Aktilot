@@ -71,9 +71,18 @@ test("revoking a share link stops it from working for the admin (regenerate/revo
   await page.goto(`/projects/${project.id}/agents`);
   await page.getByRole("button", { name: "Share agent" }).click();
   await page.getByRole("button", { name: "Generate Link" }).click();
-  await expect(page.locator('input[readonly]')).toBeVisible();
+
+  const shareUrlInput = page.locator('input[readonly]');
+  await expect(shareUrlInput).toBeVisible();
+  const shareUrl = await shareUrlInput.inputValue();
+  const sharePath = new URL(shareUrl).pathname;
 
   await page.getByRole("button", { name: "Revoke" }).click();
   await expect(page.locator('input[readonly]')).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Generate Link" })).toBeVisible();
+
+  // The revoked link must actually stop working, not just disappear from
+  // the admin UI — visiting it now must show the invalid-link state.
+  await page.goto(sharePath);
+  await expect(page.getByText("This link isn't available")).toBeVisible();
 });
