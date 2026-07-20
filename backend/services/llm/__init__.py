@@ -5,6 +5,7 @@ from services.llm.base import (
     ProviderAuthError,
     ProviderNotAvailableError,
 )
+from services.llm.ollama_provider import OllamaChatProvider, OllamaEmbeddingProvider
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
 
 
@@ -16,6 +17,9 @@ def get_chat_provider(provider: str | None = None) -> ChatProvider:
             raise ProviderAuthError("OPENAI_API_KEY is not set")
         return OpenAIChatProvider(api_key=settings.openai_api_key)
 
+    if name == "ollama":
+        return OllamaChatProvider(base_url=settings.ollama_base_url)
+
     raise ProviderNotAvailableError(f"Unknown chat provider: {name}")
 
 
@@ -26,5 +30,8 @@ def get_embedding_provider(provider: str | None = None) -> EmbeddingProvider:
         if not settings.openai_api_key:
             raise ProviderAuthError("OPENAI_API_KEY is not set")
         return OpenAIEmbeddingProvider(api_key=settings.openai_api_key)
+
+    if name == "ollama":
+        return OllamaEmbeddingProvider(base_url=settings.ollama_base_url)
 
     raise ProviderNotAvailableError(f"Unknown embedding provider: {name}")

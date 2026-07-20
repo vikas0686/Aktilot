@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from services.llm.base import ProviderAuthError, ProviderNotAvailableError
+from services.llm.ollama_provider import OllamaChatProvider, OllamaEmbeddingProvider
 from services.llm.openai_provider import OpenAIChatProvider, OpenAIEmbeddingProvider
 
 
@@ -58,3 +59,19 @@ class TestProviderFactory:
 
         with pytest.raises(ProviderAuthError, match="OPENAI_API_KEY"):
             get_embedding_provider()
+
+    @patch("services.llm.settings.llm_provider", "ollama")
+    @patch("services.llm.settings.ollama_base_url", "http://localhost:11434")
+    def test_get_chat_provider_returns_ollama(self):
+        from services.llm import get_chat_provider
+
+        provider = get_chat_provider()
+        assert isinstance(provider, OllamaChatProvider)
+
+    @patch("services.llm.settings.embedding_provider", "ollama")
+    @patch("services.llm.settings.ollama_base_url", "http://localhost:11434")
+    def test_get_embedding_provider_returns_ollama(self):
+        from services.llm import get_embedding_provider
+
+        provider = get_embedding_provider()
+        assert isinstance(provider, OllamaEmbeddingProvider)

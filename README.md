@@ -90,17 +90,43 @@ A 35-second, end-to-end walkthrough — create a project, upload a document, spi
 
 ## Getting Started
 
-The fastest way to run Aktilot is with Docker Compose. You need an [OpenAI API key](https://platform.openai.com/api-keys) and Docker installed.
-
 ```bash
 git clone https://github.com/vikas0686/aktilot.git
 cd aktilot
+```
 
+The fastest way to run Aktilot is with Docker Compose (assumes Docker is installed).
+
+### Using OpenAI (Default)
+
+You need an [OpenAI API key](https://platform.openai.com/api-keys)
+
+```bash
 cp .env.example .env
-# Open .env and set: OPENAI_API_KEY=sk-...
+# Open .env and set:
+
+# OPENAI_API_KEY=sk-...
 
 docker compose up --build
 ```
+
+### Using Ollama (local models, no API key needed)
+
+```bash
+cp .env.example .env
+# Open .env and set:
+
+#   LLM_PROVIDER=ollama
+#   CHAT_MODEL=llama3.2
+#   EMBEDDING_PROVIDER=ollama
+#   EMBEDDING_MODEL=nomic-embed-text
+
+docker compose --profile ollama up --build
+```
+
+The `ollama` profile starts a local Ollama server and automatically pulls the configured models on first run.
+
+### Services
 
 | Service | URL | Purpose |
 |---|---|---|
@@ -109,6 +135,7 @@ docker compose up --build
 | Temporal UI | http://localhost:8233 | Workflow execution history and retries |
 | Grafana | http://localhost:3002 | Observability dashboards (admin / admin) |
 | Prometheus | http://localhost:9090 | Metrics query engine |
+| Ollama | http://localhost:11434 | Local LLM server (only with `--profile ollama`) |
 
 That's it. Create a project, upload a PDF, create an agent, and start asking questions.
 
@@ -166,13 +193,14 @@ cd frontend && npm test
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
+| `OPENAI_API_KEY` | Conditional | Your OpenAI API key (If using OpenAI) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (asyncpg) |
 | `TEMPORAL_ADDRESS` | No | Temporal server address (default: `localhost:7233`) |
-| `LLM_PROVIDER` | No | Chat provider (default: `openai`). Currently supported: `openai` |
+| `LLM_PROVIDER` | No | Chat provider (default: `openai`). Currently supported: `openai`, `ollama` |
 | `CHAT_MODEL` | No | Chat model to use (default: `gpt-4o-mini`) |
-| `EMBEDDING_PROVIDER` | No | Embedding provider (default: `openai`). Currently supported: `openai` |
+| `EMBEDDING_PROVIDER` | No | Embedding provider (default: `openai`). Currently supported: `openai`, `ollama` |
 | `EMBEDDING_MODEL` | No | Embedding model (default: `text-embedding-3-small`) |
+| `OLLAMA_BASE_URL` | Conditional | Ollama server URL (default: `http://localhost:11434`) |
 | `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 

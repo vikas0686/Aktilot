@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4o-mini"
     embedding_provider: str = "openai"
     embedding_model: str = "text-embedding-3-small"
+    ollama_base_url: str = "http://localhost:11434"
     # new infra
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/docai"
     upload_dir: Path = Path("uploads")
