@@ -56,34 +56,6 @@ services:
     restart: unless-stopped
 
   # ── Application Stack ──────────────────────────────────────────────────────
-  ollama:
-    image: ollama/ollama:latest
-    profiles: ["ollama"]
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  ollama-model:
-    image: curlimages/curl:latest
-    profiles: ["ollama"]
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        set -eu
-        until curl -fsS http://ollama:11434/api/tags > /dev/null; do sleep 1; done
-        curl -fsS http://ollama:11434/api/pull -d '{"name": "${CHAT_MODEL:-llama3.2}"}'
-        curl -fsS http://ollama:11434/api/pull -d '{"name": "${EMBEDDING_MODEL:-nomic-embed-text}"}'
-    restart: "no"
 
   postgres:
     image: postgres:16-alpine

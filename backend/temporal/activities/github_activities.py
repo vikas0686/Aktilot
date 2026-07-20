@@ -307,6 +307,11 @@ async def embed_and_index_github_chunks(
                 "repo_full_name": repo_full_name,
                 "ref_type": c["ref_type"],
                 "path": c["path"],
+                # retrieval/ranking (chat_activities.hybrid_rank) and the
+                # RetrievedChunk response schema are source-agnostic and always
+                # read "filename" as the display label — upload chunks set it to
+                # the uploaded filename, so GitHub chunks need an equivalent here.
+                "filename": f"{repo_full_name}:{c['path']}",
                 "chunk_index": c["chunk_index"],
             },
         }
