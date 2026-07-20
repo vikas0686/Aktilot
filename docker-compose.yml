@@ -189,7 +189,11 @@ services:
     restart: on-failure
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_CHAT_MODEL: ${CHAT_MODEL:-gpt-4o-mini}
+        VITE_EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
     ports:
       - "3000:80"
     depends_on:
