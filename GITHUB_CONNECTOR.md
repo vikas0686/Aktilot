@@ -50,6 +50,8 @@ Go to **GitHub → Settings → Developer settings → GitHub Apps → New GitHu
 | Repository permissions | `Contents` = Read-only, `Issues` = Read-only (`Metadata` auto-selects) |
 | Where can this be installed | "Only on this account" is simplest for a single deployment |
 
+> **Setup URL ≠ Callback URL.** GitHub Apps have two similarly-named fields. **Callback URL** is only used for user-to-server OAuth (not used here). **Setup URL** is the one that controls the post-install redirect — it's what must be set to `.../api/github/install/callback`. If you set the wrong one, installing the App leaves you stranded on GitHub's own `github.com/settings/installations/<id>` page instead of bouncing back to Aktilot — see [Troubleshooting](#troubleshooting) if that happens.
+
 Click **Create GitHub App**.
 
 ### 2. Collect the credentials
@@ -113,6 +115,10 @@ docker compose up -d --build backend worker
 ## Troubleshooting
 
 **"Connect GitHub" returns a 503** — `GITHUB_APP_SLUG` or `GITHUB_APP_STATE_SECRET` isn't set. Confirm both are present in the environment the backend container/process actually reads (check with `docker compose config` if using Compose).
+
+**Install finishes but you land on `github.com/settings/installations/<id>` instead of back in Aktilot** — the App's **Setup URL** field is empty or was accidentally set to the Callback URL field instead (see the callout in step 1). Fix it under the App's settings, then either:
+- Reinstall the App (uninstall from `github.com/settings/installations/<id>` → **Configure** → **Uninstall**, then reinstall) so GitHub redirects through the now-correct Setup URL, or
+- If you have backend access, the installation already exists on GitHub's side and can be linked without reinstalling: call `GET /api/projects/{project_id}/github/install-url` to get a freshly-signed `state`, then hit `GET /api/github/install/callback?installation_id=<id>&setup_action=install&state=<that state>` directly — this replays what the browser redirect would have done.
 
 **Redirected back with `?github=error`** — the `state` param failed verification (expired after 10 minutes, or `GITHUB_APP_STATE_SECRET` changed between generating the install URL and completing the flow). Click **Connect GitHub** again.
 
