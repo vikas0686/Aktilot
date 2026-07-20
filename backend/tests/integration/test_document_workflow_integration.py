@@ -70,8 +70,10 @@ async def test_document_upload_runs_real_workflow_end_to_end(
     assert added_project_id == pid
     assert len(chunk_dicts) == record["chunk_count"]
     assert len(embeddings) == record["chunk_count"]
-    assert all(c["filename"] == "doc.txt" for c in chunk_dicts)
-    assert [c["chunk_index"] for c in chunk_dicts] == list(range(record["chunk_count"]))
+    assert all(c["metadata"]["filename"] == "doc.txt" for c in chunk_dicts)
+    assert [c["metadata"]["chunk_index"] for c in chunk_dicts] == list(
+        range(record["chunk_count"])
+    )
 
 
 async def test_document_workflow_cleans_up_temp_chunks_file_after_success(

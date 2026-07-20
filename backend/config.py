@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     share_default_daily_message_cap: int = Field(default=200, gt=0)
     share_visitor_retention_days: int = Field(default=7, gt=0)
     share_retention_sweep_interval_seconds: int = Field(default=3600, gt=0)
+    # github connector
+    github_app_id: str = ""
+    github_app_slug: str = ""
+    github_app_private_key: str = ""
+    github_app_state_secret: str = ""
+    frontend_base_url: str = "http://localhost:5173"
 
     model_config = {"env_file": ".env"}
 

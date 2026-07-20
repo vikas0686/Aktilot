@@ -31,9 +31,20 @@ from temporal.activities.document_activities import (
     read_and_split_file,
     update_file_status,
 )
+from temporal.activities.github_activities import (
+    clear_existing_vectors_for_repo,
+    embed_and_index_github_chunks,
+    fetch_file_contents,
+    fetch_issues,
+    fetch_repo_tree,
+    mark_connection_error,
+    mark_connection_synced,
+    mark_connection_syncing,
+)
 from temporal.interceptors import MetricsInterceptor
 from temporal.workflows.chat_workflow import TASK_QUEUE, ChatWorkflow
 from temporal.workflows.document_workflow import DocumentWorkflow
+from temporal.workflows.github_sync_workflow import GithubSyncWorkflow
 
 
 def _seed_gauge_cache() -> None:
@@ -79,7 +90,7 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[DocumentWorkflow, ChatWorkflow],
+        workflows=[DocumentWorkflow, ChatWorkflow, GithubSyncWorkflow],
         activities=[
             # document activities
             update_file_status,
@@ -94,6 +105,15 @@ async def main() -> None:
             hybrid_rank,
             generate_answer,
             persist_messages,
+            # github connector activities
+            mark_connection_syncing,
+            fetch_repo_tree,
+            fetch_file_contents,
+            fetch_issues,
+            clear_existing_vectors_for_repo,
+            embed_and_index_github_chunks,
+            mark_connection_synced,
+            mark_connection_error,
         ],
         interceptors=[TracingInterceptor(), MetricsInterceptor()],
     )

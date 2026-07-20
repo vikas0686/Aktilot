@@ -12,6 +12,7 @@ from api.routes import (
     agent_share,
     agents,
     chat_sessions,
+    github_connector,
     project_files,
     projects,
     public_chat,
@@ -57,6 +58,8 @@ app.include_router(agent_chat.router)
 app.include_router(agent_share.router)
 app.include_router(chat_sessions.router)
 app.include_router(public_chat.router)
+app.include_router(github_connector.router)
+app.include_router(github_connector.callback_router)
 
 
 @app.get("/api/health")

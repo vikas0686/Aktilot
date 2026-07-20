@@ -197,8 +197,11 @@ async def test_embed_and_index_chunks_happy_path(tmp_path, monkeypatch):
     assert call_args.args[0] == "proj1"
     chunk_dicts = call_args.args[1]
     assert [c["content"] for c in chunk_dicts] == ["a", "b", "c"]
-    assert [c["chunk_index"] for c in chunk_dicts] == [0, 1, 2]
-    assert all(c["file_id"] == "f1" and c["filename"] == "doc.txt" for c in chunk_dicts)
+    assert [c["metadata"]["chunk_index"] for c in chunk_dicts] == [0, 1, 2]
+    assert all(
+        c["metadata"]["file_id"] == "f1" and c["metadata"]["filename"] == "doc.txt"
+        for c in chunk_dicts
+    )
     assert call_args.args[2] == [[0.1], [0.2], [0.3]]
 
     # temp chunks file is cleaned up after a successful run

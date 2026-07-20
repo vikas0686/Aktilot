@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { projectsApi, projectFilesApi, agentsApi, agentChatApi, chatSessionsApi, filesApi, chunksApi, chatApi, shareApi, publicChatApi } from "@/services/api";
-import type { ProjectFile } from "@/types/api";
+import { projectsApi, projectFilesApi, agentsApi, agentChatApi, chatSessionsApi, filesApi, chunksApi, chatApi, shareApi, publicChatApi, githubApi } from "@/services/api";
+import type { ProjectFile, GithubConnection } from "@/types/api";
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +73,98 @@ export function useDeleteProjectFile(projectId: string) {
     mutationFn: (fileId: string) => projectFilesApi.delete(projectId, fileId),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: projectFilesKey(projectId) }),
+  });
+}
+
+// ── GitHub Connector ─────────────────────────────────────────────────────────
+
+const githubInstallationKey = (projectId: string) =>
+  ["github-installation", projectId] as const;
+const githubConnectionsKey = (projectId: string) =>
+  ["github-connections", projectId] as const;
+const githubAvailableReposKey = (projectId: string) =>
+  ["github-available-repos", projectId] as const;
+
+const isGithubSyncing = (c: GithubConnection) =>
+  c.sync_status === "pending" || c.sync_status === "syncing";
+
+export function useGithubInstallUrl(projectId: string) {
+  return useMutation({
+    mutationFn: () => githubApi.getInstallUrl(projectId).then((r) => r.data),
+  });
+}
+
+export function useGithubInstallation(projectId: string) {
+  return useQuery({
+    queryKey: githubInstallationKey(projectId),
+    queryFn: () => githubApi.getInstallation(projectId).then((r) => r.data),
+    enabled: !!projectId,
+    retry: false,
+  });
+}
+
+export function useGithubConnections(projectId: string) {
+  return useQuery({
+    queryKey: githubConnectionsKey(projectId),
+    queryFn: () => githubApi.listConnections(projectId).then((r) => r.data),
+    enabled: !!projectId,
+    refetchInterval: (query) => {
+      const data = query.state.data as GithubConnection[] | undefined;
+      return data?.some(isGithubSyncing) ? 3000 : false;
+    },
+  });
+}
+
+export function useAvailableGithubRepos(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: githubAvailableReposKey(projectId),
+    queryFn: () => githubApi.listAvailableRepos(projectId).then((r) => r.data),
+    enabled: !!projectId && enabled,
+  });
+}
+
+export function useConnectGithubRepo(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ repoFullName, branch }: { repoFullName: string; branch?: string }) =>
+      githubApi.connectRepo(projectId, repoFullName, branch).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubConnectionsKey(projectId) });
+      qc.invalidateQueries({ queryKey: githubAvailableReposKey(projectId) });
+    },
+  });
+}
+
+export function useSyncGithubConnection(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      githubApi.syncConnection(projectId, connectionId).then((r) => r.data),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: githubConnectionsKey(projectId) }),
+  });
+}
+
+export function useDisconnectGithubConnection(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      githubApi.disconnectConnection(projectId, connectionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubConnectionsKey(projectId) });
+      qc.invalidateQueries({ queryKey: githubAvailableReposKey(projectId) });
+    },
+  });
+}
+
+export function useDisconnectGithubInstallation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => githubApi.disconnectInstallation(projectId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubInstallationKey(projectId) });
+      qc.invalidateQueries({ queryKey: githubConnectionsKey(projectId) });
+    },
   });
 }
 
