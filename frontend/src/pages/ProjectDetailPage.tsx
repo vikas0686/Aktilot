@@ -1,11 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
 import { Loader2, Trash2 } from "lucide-react";
 import { useProject, useDeleteProject } from "@/hooks/useApi";
-import { FilesTab } from "@/components/FilesTab";
-import { GitHubTab } from "@/components/GitHubTab";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export function ProjectDetailPage() {
@@ -84,18 +81,7 @@ export function ProjectDetailPage() {
         </button>
       </div>
 
-      <Tabs defaultValue="files">
-        <TabsList>
-          <TabsTrigger value="files">Uploaded Files</TabsTrigger>
-          <TabsTrigger value="github">GitHub</TabsTrigger>
-        </TabsList>
-        <TabsContent value="files">
-          <FilesTab projectId={project.id} />
-        </TabsContent>
-        <TabsContent value="github">
-          <GitHubTab projectId={project.id} />
-        </TabsContent>
-      </Tabs>
+      <Outlet />
     </div>
   );
 }

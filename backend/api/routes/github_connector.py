@@ -104,9 +104,9 @@ async def install_callback(
             account_login=account_login,
             account_type=account_type,
         )
-        redirect_url = f"{settings.frontend_base_url}/projects/{project_id}?github=connected"
+        redirect_url = f"{settings.frontend_base_url}/projects/{project_id}/github?github=connected"
     else:
-        redirect_url = f"{settings.frontend_base_url}/projects/{project_id}?github=error"
+        redirect_url = f"{settings.frontend_base_url}/projects/{project_id}/github?github=error"
 
     return RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
