@@ -8,6 +8,8 @@ from models.schemas import (
     AgentUpdate,
     ChatRequest,
     ProjectCreate,
+    PublicChatResponse,
+    ShareLinkCreate,
 )
 
 # ── ProjectCreate ─────────────────────────────────────────────────────────────
@@ -88,3 +90,43 @@ def test_chat_request_stores_question():
     r = ChatRequest(question="What is the invoice total?", session_id=sid)
     assert r.question == "What is the invoice total?"
     assert r.session_id == sid
+
+
+# ── ShareLinkCreate ───────────────────────────────────────────────────────────
+
+
+def test_share_link_create_defaults_to_none():
+    s = ShareLinkCreate()
+    assert s.daily_message_cap is None
+
+
+def test_share_link_create_accepts_positive_cap():
+    s = ShareLinkCreate(daily_message_cap=50)
+    assert s.daily_message_cap == 50
+
+
+def test_share_link_create_rejects_zero_cap():
+    with pytest.raises(ValidationError):
+        ShareLinkCreate(daily_message_cap=0)
+
+
+def test_share_link_create_rejects_negative_cap():
+    with pytest.raises(ValidationError):
+        ShareLinkCreate(daily_message_cap=-1)
+
+
+# ── PublicChatResponse ────────────────────────────────────────────────────────
+
+
+def test_public_chat_response_only_has_answer():
+    """Regression lock at the schema level for the metadata-leak fix: the
+    public chat response must never gain tool_steps/retrieved_chunks fields
+    back without a deliberate, visible change here."""
+    r = PublicChatResponse(answer="42")
+    assert r.answer == "42"
+    assert set(r.model_fields) == {"answer"}
+
+
+def test_public_chat_response_requires_answer():
+    with pytest.raises(ValidationError):
+        PublicChatResponse()  # type: ignore[call-arg]

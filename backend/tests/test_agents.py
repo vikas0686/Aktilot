@@ -48,6 +48,39 @@ async def test_create_agent_name_required(client):
     assert r.status_code == 422
 
 
+async def test_create_agent_empty_name_is_currently_accepted(client):
+    """Known gap: AgentCreate.name has no min_length constraint (unlike, say,
+    ShareLinkCreate.daily_message_cap's gt=0), so an empty string passes
+    validation. Documents current behavior rather than assuming it's fine."""
+    pid = await _create_project(client)
+    r = await client.post(f"/api/projects/{pid}/agents", json={"name": ""})
+    assert r.status_code == 201
+    assert r.json()["name"] == ""
+
+
+async def test_create_agent_top_k_zero_is_currently_accepted(client):
+    """Known gap: AgentCreate.top_k has no bounds check at all (the frontend
+    clamps to 1-10 client-side, but nothing enforces that server-side), so
+    0 and negative values pass straight through to the DB and into
+    hybrid_rank's `ranked[:top_k]` slicing, where a negative top_k silently
+    drops from the end of the list instead of erroring."""
+    pid = await _create_project(client)
+    r = await client.post(
+        f"/api/projects/{pid}/agents", json={"name": "Bot", "top_k": 0}
+    )
+    assert r.status_code == 201
+    assert r.json()["top_k"] == 0
+
+
+async def test_create_agent_top_k_negative_is_currently_accepted(client):
+    pid = await _create_project(client)
+    r = await client.post(
+        f"/api/projects/{pid}/agents", json={"name": "Bot", "top_k": -3}
+    )
+    assert r.status_code == 201
+    assert r.json()["top_k"] == -3
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 
@@ -117,6 +150,59 @@ async def test_update_agent_not_found(client):
         "/api/agents/00000000-0000-0000-0000-000000000000", json={"name": "X"}
     )
     assert r.status_code == 404
+
+
+async def test_update_agent_partial_update_preserves_other_fields(client):
+    """Updating just one field must leave the others exactly as they were —
+    AgentUpdate's fields are all optional and the service only assigns the
+    ones that aren't None, but that behavior isn't locked in anywhere yet."""
+    pid = await _create_project(client)
+    aid = (
+        await client.post(
+            f"/api/projects/{pid}/agents",
+            json={
+                "name": "Original",
+                "description": "Original desc",
+                "system_prompt": "Original prompt",
+                "top_k": 4,
+            },
+        )
+    ).json()["id"]
+
+    r = await client.put(f"/api/agents/{aid}", json={"name": "Renamed"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Renamed"
+    assert body["description"] == "Original desc"
+    assert body["system_prompt"] == "Original prompt"
+    assert body["top_k"] == 4
+
+
+async def test_update_agent_empty_body_is_a_noop(client):
+    pid = await _create_project(client)
+    aid = (
+        await client.post(
+            f"/api/projects/{pid}/agents",
+            json={"name": "Original", "top_k": 3},
+        )
+    ).json()["id"]
+
+    r = await client.put(f"/api/agents/{aid}", json={})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Original"
+    assert body["top_k"] == 3
+
+
+async def test_update_agent_top_k_to_zero_is_currently_accepted(client):
+    """Same gap as create — update path has no bounds check either."""
+    pid = await _create_project(client)
+    aid = (
+        await client.post(f"/api/projects/{pid}/agents", json={"name": "Bot"})
+    ).json()["id"]
+    r = await client.put(f"/api/agents/{aid}", json={"top_k": 0})
+    assert r.status_code == 200
+    assert r.json()["top_k"] == 0
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────

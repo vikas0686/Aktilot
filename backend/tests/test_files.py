@@ -61,6 +61,39 @@ async def test_upload_allowed_extensions(client):
         assert r.status_code == 201, f"Expected 201 for {filename}, got {r.status_code}"
 
 
+async def test_upload_extension_check_is_case_insensitive(client):
+    pid = await _create_project(client)
+    with _mock_temporal():
+        r = await client.post(
+            f"/api/projects/{pid}/files/upload",
+            files={"file": ("DOC.PDF", io.BytesIO(b"content"), "application/pdf")},
+        )
+    assert r.status_code == 201
+
+
+async def test_upload_rejects_filename_with_no_extension(client):
+    pid = await _create_project(client)
+    r = await client.post(
+        f"/api/projects/{pid}/files/upload",
+        files={"file": ("README", io.BytesIO(b"content"), "text/plain")},
+    )
+    assert r.status_code == 400
+    assert "Unsupported" in r.json()["detail"]
+
+
+async def test_upload_accepts_empty_file(client):
+    """A 0-byte upload is unusual but not invalid — it must not crash the
+    route; it'll simply produce zero chunks downstream."""
+    pid = await _create_project(client)
+    with _mock_temporal():
+        r = await client.post(
+            f"/api/projects/{pid}/files/upload",
+            files={"file": ("empty.txt", io.BytesIO(b""), "text/plain")},
+        )
+    assert r.status_code == 201
+    assert r.json()["size"] == 0
+
+
 # ── Upload success ────────────────────────────────────────────────────────────
 
 
@@ -163,3 +196,44 @@ async def test_delete_file_removes_it(client):
 
     files = (await client.get(f"/api/projects/{pid}/files")).json()
     assert all(f["id"] != fid for f in files)
+
+
+async def test_delete_file_removes_it_from_disk(client):
+    """Deleting a file must remove the underlying upload on disk, not just
+    the DB row — mirrors the project-level disk-cleanup test."""
+    pid = await _create_project(client)
+    with _mock_temporal():
+        fid = (
+            await client.post(f"/api/projects/{pid}/files/upload", files=_txt_file())
+        ).json()["id"]
+
+    files = (await client.get(f"/api/projects/{pid}/files")).json()
+    filename = next(f for f in files if f["id"] == fid)["filename"]
+    from config import project_upload_dir
+
+    dest = project_upload_dir(pid) / f"{fid}_{filename}"
+    assert dest.exists()
+
+    with patch("services.project_file_service.chroma_delete_file"):
+        r = await client.delete(f"/api/projects/{pid}/files/{fid}")
+    assert r.status_code == 204
+
+    assert not dest.exists()
+
+
+async def test_delete_file_wrong_project_returns_404_and_does_not_delete(client):
+    """A file belonging to project A must not be deletable through project
+    B's route — the mismatched project_id must 404, and the file must
+    survive untouched."""
+    pid_a = await _create_project(client, "A")
+    pid_b = await _create_project(client, "B")
+    with _mock_temporal():
+        fid = (
+            await client.post(f"/api/projects/{pid_a}/files/upload", files=_txt_file())
+        ).json()["id"]
+
+    r = await client.delete(f"/api/projects/{pid_b}/files/{fid}")
+    assert r.status_code == 404
+
+    files = (await client.get(f"/api/projects/{pid_a}/files")).json()
+    assert any(f["id"] == fid for f in files)
