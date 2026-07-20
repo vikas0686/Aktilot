@@ -79,9 +79,10 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       - |
-        until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 1; done
-        curl -s http://ollama:11434/api/pull -d '{"name": "${CHAT_MODEL:-llama3.2}"}'
-        curl -s http://ollama:11434/api/pull -d '{"name": "${EMBEDDING_MODEL:-nomic-embed-text}"}'
+        set -eu
+        until curl -fsS http://ollama:11434/api/tags > /dev/null; do sleep 1; done
+        curl -fsS http://ollama:11434/api/pull -d '{"name": "${CHAT_MODEL:-llama3.2}"}'
+        curl -fsS http://ollama:11434/api/pull -d '{"name": "${EMBEDDING_MODEL:-nomic-embed-text}"}'
     restart: "no"
 
   postgres:

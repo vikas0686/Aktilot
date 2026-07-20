@@ -4,6 +4,7 @@ Tests for Ollama provider implementations (chat + embedding).
 
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from services.llm.base import (
@@ -99,6 +100,37 @@ class TestOllamaChatProvider:
         assert result.total_tokens == 15
         assert result.finish_reason == "stop"
 
+    @pytest.mark.asyncio
+    async def test_generate_raises_on_httpx_connect_error(self):
+        """Validate the actual exception type raised by the Ollama SDK."""
+        provider = OllamaChatProvider(base_url="http://localhost:11434")
+        provider._client.chat = AsyncMock(
+            side_effect=httpx.ConnectError("Connection refused")
+        )
+
+        with pytest.raises(ProviderServiceError) as exc:
+            await provider.generate(
+                model="llama3.1",
+                messages=[{"role": "user", "content": "Hi"}],
+            )
+
+        assert exc.value.reason == "connection_refused"
+
+    @pytest.mark.asyncio
+    async def test_generate_raises_on_timeout(self):
+        provider = OllamaChatProvider(base_url="http://localhost:11434")
+        provider._client.chat = AsyncMock(
+            side_effect=httpx.ReadTimeout("Read timed out")
+        )
+
+        with pytest.raises(ProviderServiceError) as exc:
+            await provider.generate(
+                model="llama3.1",
+                messages=[{"role": "user", "content": "Hi"}],
+            )
+
+        assert exc.value.reason == "timeout"
+
 
 class TestOllamaEmbeddingProvider:
     @pytest.mark.asyncio
@@ -144,3 +176,34 @@ class TestOllamaEmbeddingProvider:
             )
 
         assert exc.value.reason == "connection_refused"
+
+    @pytest.mark.asyncio
+    async def test_embed_raises_on_httpx_connect_error(self):
+        """Validate the actual exception type raised by the Ollama SDK."""
+        provider = OllamaEmbeddingProvider(base_url="http://localhost:11434")
+        provider._client.embed = AsyncMock(
+            side_effect=httpx.ConnectError("Connection refused")
+        )
+
+        with pytest.raises(ProviderServiceError) as exc:
+            await provider.embed(
+                model="nomic-embed-text",
+                texts=["hello"],
+            )
+
+        assert exc.value.reason == "connection_refused"
+
+    @pytest.mark.asyncio
+    async def test_embed_raises_on_timeout(self):
+        provider = OllamaEmbeddingProvider(base_url="http://localhost:11434")
+        provider._client.embed = AsyncMock(
+            side_effect=httpx.ReadTimeout("Read timed out")
+        )
+
+        with pytest.raises(ProviderServiceError) as exc:
+            await provider.embed(
+                model="nomic-embed-text",
+                texts=["hello"],
+            )
+
+        assert exc.value.reason == "timeout"

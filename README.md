@@ -196,13 +196,13 @@ cd frontend && npm test
 | `OPENAI_API_KEY` | Conditional | Your OpenAI API key (If using OpenAI) |
 | `DATABASE_URL` | Yes | PostgreSQL connection string (asyncpg) |
 | `TEMPORAL_ADDRESS` | No | Temporal server address (default: `localhost:7233`) |
-| `LLM_PROVIDER` | Yes | Chat provider (default: `openai`). Currently supported: `openai`, `ollama` |
-| `CHAT_MODEL` | Yes | Chat model to use (default: `gpt-4o-mini`) |
-| `EMBEDDING_PROVIDER` | Yes | Embedding provider (default: `openai`). Currently supported: `openai`, `ollama` |
-| `EMBEDDING_MODEL` | Yes | Embedding model (default: `text-embedding-3-small`) |
+| `LLM_PROVIDER` | No | Chat provider (default: `openai`). Currently supported: `openai`, `ollama` |
+| `CHAT_MODEL` | No | Chat model to use (default: `gpt-4o-mini`) |
+| `EMBEDDING_PROVIDER` | No | Embedding provider (default: `openai`). Currently supported: `openai`, `ollama` |
+| `EMBEDDING_MODEL` | No | Embedding model (default: `text-embedding-3-small`) |
 | `OLLAMA_BASE_URL` | Conditional | Ollama server URL (default: `http://localhost:11434`) |
-| `UPLOAD_DIR` | Yes | Where uploaded files are stored (default: `uploads`) |
-| `CHROMA_DIR` | Yes | Where vector data is persisted (default: `chroma_data`) |
+| `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
+| `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
 
