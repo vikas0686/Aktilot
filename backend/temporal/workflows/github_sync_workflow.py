@@ -83,7 +83,7 @@ class GithubSyncWorkflow:
         )
 
         try:
-            tree_count: int = await workflow.execute_activity(
+            tree_result: dict = await workflow.execute_activity(
                 fetch_repo_tree,
                 args=[
                     connection_id,
@@ -95,6 +95,8 @@ class GithubSyncWorkflow:
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=_GITHUB_RETRY,
             )
+            tree_count: int = tree_result["count"]
+            tree_truncated: bool = tree_result["truncated"]
 
             # Chunks are written to temp files on disk — not passed through Temporal
             # history — so large repos never hit the 4 MB payload limit.
@@ -133,7 +135,13 @@ class GithubSyncWorkflow:
 
             await workflow.execute_activity(
                 mark_connection_synced,
-                args=[connection_id, tree_count, issue_count, chunk_count],
+                args=[
+                    connection_id,
+                    tree_count,
+                    issue_count,
+                    chunk_count,
+                    tree_truncated,
+                ],
                 start_to_close_timeout=timedelta(seconds=15),
                 retry_policy=_INFRA_RETRY,
             )

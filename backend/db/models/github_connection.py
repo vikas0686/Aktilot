@@ -37,6 +37,9 @@ class GithubConnection(Base):
     file_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     issue_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     chunk_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    tree_truncated: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, default=False
+    )
     last_synced_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )

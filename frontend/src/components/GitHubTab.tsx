@@ -155,6 +155,14 @@ function ConnectionRow({
               {connection.error_message}
             </p>
           )}
+          {connection.sync_status === "synced" && connection.tree_truncated && (
+            <p
+              className="mt-1 text-xs text-amber-600 dark:text-amber-500"
+              title="GitHub's API truncated this repo's file tree — only part of it was indexed."
+            >
+              Partially indexed (repo too large)
+            </p>
+          )}
         </div>
       </div>
 

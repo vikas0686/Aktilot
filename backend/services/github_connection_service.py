@@ -86,12 +86,14 @@ async def mark_synced(
     file_count: int,
     issue_count: int,
     chunk_count: int,
+    tree_truncated: bool = False,
 ) -> None:
     record = await get(db, connection_id)
     record.sync_status = "synced"
     record.file_count = file_count
     record.issue_count = issue_count
     record.chunk_count = chunk_count
+    record.tree_truncated = tree_truncated
     record.last_synced_at = datetime.now(timezone.utc)
     record.error_message = None
     await db.commit()

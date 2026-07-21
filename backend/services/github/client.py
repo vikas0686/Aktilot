@@ -132,8 +132,11 @@ async def list_installation_repos(token: str) -> list[dict]:
     ]
 
 
-async def get_tree(token: str, repo_full_name: str, branch: str) -> list[dict]:
-    """Returns the full recursive file tree: [{path, sha, size, type}, ...] (blobs only)."""
+async def get_tree(
+    token: str, repo_full_name: str, branch: str
+) -> tuple[list[dict], bool]:
+    """Returns (blobs, truncated) — the full recursive file tree filtered to
+    blobs, plus whether GitHub reported the tree as truncated."""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
         resp = await http.get(
             f"{_GITHUB_API}/repos/{repo_full_name}/git/trees/{branch}",
@@ -142,15 +145,18 @@ async def get_tree(token: str, repo_full_name: str, branch: str) -> list[dict]:
         )
         _raise_for_status(resp)
         data = resp.json()
-    if data.get("truncated"):
+    truncated = bool(data.get("truncated"))
+    if truncated:
         # Repo tree too large for a single recursive call — still index what we got
-        # rather than fail the whole sync.
+        # rather than fail the whole sync. Caller surfaces this on the connection
+        # record so it's visible beyond this log line.
         logger.warning(
             "GitHub tree for %s@%s was truncated; indexing partial contents only",
             repo_full_name,
             branch,
         )
-    return [item for item in data.get("tree", []) if item.get("type") == "blob"]
+    blobs = [item for item in data.get("tree", []) if item.get("type") == "blob"]
+    return blobs, truncated
 
 
 async def get_blob(token: str, repo_full_name: str, sha: str) -> str:

@@ -119,6 +119,7 @@ class GithubConnectionResponse(BaseModel):
     file_count: int
     issue_count: int
     chunk_count: int
+    tree_truncated: bool
     last_synced_at: datetime | None
     error_message: str | None
     created_at: datetime

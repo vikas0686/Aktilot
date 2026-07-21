@@ -102,7 +102,7 @@ docker compose up -d --build backend worker
 
 ## Using it
 
-1. Open a project's **Knowledge Base** page → **GitHub** tab.
+1. Open a project's **Knowledge Base** page → **GitHub Repository** card → `/github` route.
 2. Click **Connect GitHub** — you're redirected to GitHub's install page for your App.
 3. Choose the account/org and grant access to one or more repositories, then confirm. GitHub redirects back to the project with the installation recorded.
 4. Click **Add Repository** and pick a repo the installation can see. This kicks off the first sync.

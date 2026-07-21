@@ -130,6 +130,7 @@ export interface GithubConnection {
   file_count: number;
   issue_count: number;
   chunk_count: number;
+  tree_truncated: boolean;
   last_synced_at: string | null;
   error_message: string | null;
   created_at: string;

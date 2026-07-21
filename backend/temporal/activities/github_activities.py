@@ -138,7 +138,11 @@ async def mark_connection_syncing(connection_id: str) -> None:
 
 @activity.defn
 async def mark_connection_synced(
-    connection_id: str, file_count: int, issue_count: int, chunk_count: int
+    connection_id: str,
+    file_count: int,
+    issue_count: int,
+    chunk_count: int,
+    tree_truncated: bool,
 ) -> None:
     async with AsyncSessionFactory() as db:
         result = await db.execute(
@@ -151,6 +155,7 @@ async def mark_connection_synced(
         record.file_count = file_count
         record.issue_count = issue_count
         record.chunk_count = chunk_count
+        record.tree_truncated = tree_truncated
         record.last_synced_at = datetime.now(timezone.utc)
         record.error_message = None
         await db.commit()
@@ -177,12 +182,14 @@ async def fetch_repo_tree(
     installation_id: int,
     repo_full_name: str,
     branch: str,
-) -> int:
+) -> dict:
     """Lists the repo's recursive file tree, filters to indexable blobs, writes
-    {path, sha, size} entries to a temp JSON file. Returns the filtered count."""
+    {path, sha, size} entries to a temp JSON file. Returns
+    {"count": filtered count, "truncated": whether GitHub's tree API truncated
+    the result}."""
     token = await get_installation_token(installation_id)
     try:
-        tree = await gh_client.get_tree(token, repo_full_name, branch)
+        tree, truncated = await gh_client.get_tree(token, repo_full_name, branch)
     except (gh_client.GithubAuthError, gh_client.GithubNotFoundError) as exc:
         raise ApplicationError(str(exc), non_retryable=True) from exc
 
@@ -195,7 +202,7 @@ async def fetch_repo_tree(
     out = _tree_path(project_id, connection_id)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(filtered))
-    return len(filtered)
+    return {"count": len(filtered), "truncated": truncated}
 
 
 @activity.defn
