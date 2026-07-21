@@ -1,8 +1,11 @@
 # Running Ollama locally with Docker Compose
 
-Aktilot can use [Ollama](https://ollama.com) as a fully local, air-gapped LLM and embedding
+Aktilot can use [Ollama](https://ollama.com) as a local/private LLM and embedding
 provider — no API key required. This guide walks through adding the `ollama` service to
-`docker-compose.yml` so it starts alongside the rest of the stack.
+`docker-compose.yml` so it starts alongside the rest of the stack. Note this isn't truly
+air-gapped out of the box: the first run still pulls the Ollama Docker image and models
+over the network. For a genuinely air-gapped setup, preload the image and models before
+going offline.
 
 ## 1. Add the services
 

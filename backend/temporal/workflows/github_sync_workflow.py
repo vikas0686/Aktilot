@@ -133,7 +133,7 @@ class GithubSyncWorkflow:
 
             await workflow.execute_activity(
                 mark_connection_synced,
-                args=[connection_id, tree_count + issue_count, chunk_count],
+                args=[connection_id, tree_count, issue_count, chunk_count],
                 start_to_close_timeout=timedelta(seconds=15),
                 retry_policy=_INFRA_RETRY,
             )

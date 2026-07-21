@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 import time
 import uuid
 
@@ -27,6 +28,8 @@ from services.github.app_auth import get_installation_token
 from temporal.client import get_temporal_client
 from temporal.workflows.github_sync_workflow import TASK_QUEUE, GithubSyncWorkflow
 from vectorstore.chroma_store import delete_by_repo as chroma_delete_by_repo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/projects", tags=["github-connector"])
 # GitHub's App settings only accept one fixed callback URL — it can't be
@@ -80,21 +83,35 @@ async def get_install_url(project_id: uuid.UUID, db: AsyncSession = Depends(get_
 
 @callback_router.get("/api/github/install/callback")
 async def install_callback(
-    installation_id: int,
     state: str,
+    installation_id: int | None = None,
     setup_action: str = "",
     db: AsyncSession = Depends(get_db),
 ):
+    if not settings.github_app_state_secret:
+        raise HTTPException(status_code=503, detail="GitHub App is not configured")
+
     project_id = _verify_state(state)
     await project_service.get(db, project_id)
 
-    if setup_action in ("", "install"):
+    if setup_action == "request":
+        # Org-owned App install requires admin approval — GitHub redirects here
+        # with no installation_id yet, since the installation isn't created
+        # until an admin approves the request.
+        redirect_url = (
+            f"{settings.frontend_base_url}/projects/{project_id}/github?github=pending"
+        )
+    elif setup_action in ("", "install", "update") and installation_id is not None:
         try:
             details = await gh_client.get_installation(installation_id)
             account = details.get("account") or {}
             account_login = account.get("login", "unknown")
             account_type = account.get("type", "unknown")
         except Exception:
+            logger.exception(
+                "failed to fetch installation details for installation_id=%s",
+                installation_id,
+            )
             account_login, account_type = "unknown", "unknown"
 
         await github_installation_service.upsert(
@@ -140,7 +157,11 @@ async def disconnect_installation(
     try:
         await gh_client.uninstall_app(installation.installation_id)
     except Exception:
-        pass  # best-effort — local records are removed regardless
+        logger.exception(
+            "failed to uninstall GitHub App for installation_id=%s; "
+            "local records are removed regardless",
+            installation.installation_id,
+        )
 
     await github_installation_service.delete(db, installation)
 
@@ -192,19 +213,30 @@ async def connect_repo(
     )
 
     tc = await get_temporal_client()
-    await tc.start_workflow(
-        GithubSyncWorkflow.run,
-        args=[
-            str(record.id),
-            str(project_id),
-            installation.installation_id,
-            body.repo_full_name,
-            branch,
-            "full",
-        ],
-        id=f"gh-sync-{record.id}",
-        task_queue=TASK_QUEUE,
-    )
+    try:
+        await tc.start_workflow(
+            GithubSyncWorkflow.run,
+            args=[
+                str(record.id),
+                str(project_id),
+                installation.installation_id,
+                body.repo_full_name,
+                branch,
+                "full",
+            ],
+            id=f"gh-sync-{record.id}",
+            task_queue=TASK_QUEUE,
+        )
+    except Exception:
+        logger.exception(
+            "failed to start sync workflow for connection_id=%s", record.id
+        )
+        await github_connection_service.mark_error(
+            db, record.id, "Failed to start the sync workflow — try syncing again"
+        )
+        raise HTTPException(
+            status_code=502, detail="Failed to start the GitHub sync workflow"
+        )
     return record
 
 

@@ -128,6 +128,7 @@ export interface GithubConnection {
   default_branch: string;
   sync_status: "pending" | "syncing" | "synced" | "error";
   file_count: number;
+  issue_count: number;
   chunk_count: number;
   last_synced_at: string | null;
   error_message: string | null;

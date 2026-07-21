@@ -124,7 +124,7 @@ cp .env.example .env
 docker compose --profile ollama up --build
 ```
 The `ollama` profile starts a local Ollama server and automatically pulls the configured models on first run.
-Read [OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) for how to set up the ollama in docker compose file.
+Read [OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) for how to add Ollama to the Docker Compose file.
 
 ### Services
 
@@ -205,8 +205,8 @@ cd frontend && npm test
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
 | `GITHUB_APP_ID` | No | Enables the GitHub connector — see [GITHUB_CONNECTOR.md](docs/GITHUB_CONNECTOR.md) |
 | `GITHUB_APP_SLUG` | No | Required alongside the other `GITHUB_APP_*` vars to enable the connector |
-| `GITHUB_APP_PRIVATE_KEY` | No | " |
-| `GITHUB_APP_STATE_SECRET` | No | " |
+| `GITHUB_APP_PRIVATE_KEY` | No | The downloaded PEM, with real newlines replaced by literal `\n` |
+| `GITHUB_APP_STATE_SECRET` | No | Random secret used to HMAC-sign the `state` param carrying project identity through the install redirect |
 | `FRONTEND_BASE_URL` | No | Where the GitHub install flow redirects back to (default: `http://localhost:3000`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).

@@ -35,6 +35,7 @@ class GithubConnection(Base):
         sa.String(20), nullable=False, default="pending"
     )
     file_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    issue_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     chunk_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     last_synced_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True

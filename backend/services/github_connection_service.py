@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.github_connection import GithubConnection
@@ -35,7 +36,13 @@ async def create(
         sync_status="pending",
     )
     db.add(record)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409, detail=f"{repo_full_name} is already connected"
+        )
     await db.refresh(record)
     return record
 
@@ -74,11 +81,16 @@ async def mark_syncing(db: AsyncSession, connection_id: uuid.UUID) -> None:
 
 
 async def mark_synced(
-    db: AsyncSession, connection_id: uuid.UUID, file_count: int, chunk_count: int
+    db: AsyncSession,
+    connection_id: uuid.UUID,
+    file_count: int,
+    issue_count: int,
+    chunk_count: int,
 ) -> None:
     record = await get(db, connection_id)
     record.sync_status = "synced"
     record.file_count = file_count
+    record.issue_count = issue_count
     record.chunk_count = chunk_count
     record.last_synced_at = datetime.now(timezone.utc)
     record.error_message = None

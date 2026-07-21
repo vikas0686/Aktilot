@@ -138,7 +138,7 @@ async def mark_connection_syncing(connection_id: str) -> None:
 
 @activity.defn
 async def mark_connection_synced(
-    connection_id: str, file_count: int, chunk_count: int
+    connection_id: str, file_count: int, issue_count: int, chunk_count: int
 ) -> None:
     async with AsyncSessionFactory() as db:
         result = await db.execute(
@@ -149,6 +149,7 @@ async def mark_connection_synced(
         record = result.scalar_one()
         record.sync_status = "synced"
         record.file_count = file_count
+        record.issue_count = issue_count
         record.chunk_count = chunk_count
         record.last_synced_at = datetime.now(timezone.utc)
         record.error_message = None
@@ -338,7 +339,7 @@ async def embed_and_index_github_chunks(
 
     chunk_dicts = [
         {
-            "id": str(uuid.uuid4()),
+            "id": f"{connection_id}:{c['ref_type']}:{c['path']}:{c['chunk_index']}",
             "content": c["content"],
             "metadata": {
                 "source_type": "github",

@@ -29,6 +29,7 @@ def upgrade() -> None:
             "sync_status", sa.String(20), nullable=False, server_default="pending"
         ),
         sa.Column("file_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("issue_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("chunk_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),

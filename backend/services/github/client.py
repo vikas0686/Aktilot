@@ -6,11 +6,14 @@ calls (uninstall) sign their own app JWT.
 """
 
 import base64
+import logging
 import re
 
 import httpx
 
 from services.github.app_auth import _app_jwt
+
+logger = logging.getLogger(__name__)
 
 _GITHUB_API = "https://api.github.com"
 _API_VERSION = "2022-11-28"
@@ -142,7 +145,11 @@ async def get_tree(token: str, repo_full_name: str, branch: str) -> list[dict]:
     if data.get("truncated"):
         # Repo tree too large for a single recursive call — still index what we got
         # rather than fail the whole sync.
-        pass
+        logger.warning(
+            "GitHub tree for %s@%s was truncated; indexing partial contents only",
+            repo_full_name,
+            branch,
+        )
     return [item for item in data.get("tree", []) if item.get("type") == "blob"]
 
 

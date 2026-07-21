@@ -1,12 +1,12 @@
 # GitHub Connector
 
-The Knowledge Base page has a **GitHub** tab alongside **Uploaded Files**. It lets a project ingest an entire GitHub repository — file contents and issues (with comments) — into the same searchable vector store as uploaded documents, kept as a clearly separate, independently-syncable source.
+The Knowledge Base landing page links to a dedicated **GitHub Repository** route alongside **Uploaded Files**. It lets a project ingest an entire GitHub repository — file contents and issues (with comments) — into the same searchable vector store as uploaded documents, kept as a clearly separate, independently-syncable source.
 
 ---
 
 ## How it works
 
-```
+```text
 GitHub App (installed on your org/account)
     │
     │  install → signed state param → callback

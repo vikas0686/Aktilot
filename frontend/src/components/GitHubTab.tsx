@@ -217,6 +217,11 @@ export function GitHubTab({ projectId }: { projectId: string }) {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Captured once on mount, before the effect below strips the query param —
+  // the installation query is still loading at that point, so reading
+  // searchParams fresh at render time would find it already gone.
+  const [githubStatus] = useState(() => searchParams.get("github"));
+
   useEffect(() => {
     if (searchParams.has("github")) {
       const next = new URLSearchParams(searchParams);
@@ -225,8 +230,6 @@ export function GitHubTab({ projectId }: { projectId: string }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const githubStatus = searchParams.get("github");
 
   const handleConnectGithub = () => {
     installUrl.mutate(undefined, {

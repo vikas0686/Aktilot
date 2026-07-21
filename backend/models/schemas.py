@@ -117,6 +117,7 @@ class GithubConnectionResponse(BaseModel):
     default_branch: str
     sync_status: str
     file_count: int
+    issue_count: int
     chunk_count: int
     last_synced_at: datetime | None
     error_message: str | None
