@@ -27,21 +27,16 @@ def add_chunks(
     embeddings: list[list[float]],
 ) -> None:
     """
-    chunks: list of {id, file_id, filename, chunk_index, content}
+    chunks: list of {id, content, metadata}. `metadata` is stored as-is on the
+    Chroma record, so callers (uploads, GitHub connector, ...) each decide what
+    to tag their chunks with (file_id/filename vs repo_id/repo_full_name/path).
     """
     collection = get_collection(project_id)
     collection.add(
         ids=[c["id"] for c in chunks],
         embeddings=embeddings,
         documents=[c["content"] for c in chunks],
-        metadatas=[
-            {
-                "file_id": c["file_id"],
-                "filename": c["filename"],
-                "chunk_index": c["chunk_index"],
-            }
-            for c in chunks
-        ],
+        metadatas=[c["metadata"] for c in chunks],
     )
 
 
@@ -75,6 +70,14 @@ def delete_file(project_id: str, file_id: str) -> None:
     """Remove all chunks belonging to file_id from the project collection."""
     collection = get_collection(project_id)
     existing = collection.get(where={"file_id": file_id})
+    if existing["ids"]:
+        collection.delete(ids=existing["ids"])
+
+
+def delete_by_repo(project_id: str, repo_id: str) -> None:
+    """Remove all chunks belonging to a GitHub connection (repo_id) from the project collection."""
+    collection = get_collection(project_id)
+    existing = collection.get(where={"repo_id": repo_id})
     if existing["ids"]:
         collection.delete(ids=existing["ids"])
 

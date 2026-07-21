@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectDetailPage } from "@/pages/ProjectDetailPage";
+import { KnowledgeBaseLandingRoute } from "@/pages/KnowledgeBaseLandingRoute";
+import { ProjectFilesPage } from "@/pages/ProjectFilesPage";
+import { ProjectGitHubPage } from "@/pages/ProjectGitHubPage";
 import { ProjectAgentsPage } from "@/pages/ProjectAgentsPage";
 import { AgentChatPage } from "@/pages/AgentChatPage";
 import { PublicChatPage } from "@/pages/PublicChatPage";
@@ -26,7 +29,11 @@ export default function App() {
               <AppShell>
                 <Routes>
                   <Route path="/" element={<ProjectsPage />} />
-                  <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+                  <Route path="/projects/:projectId" element={<ProjectDetailPage />}>
+                    <Route index element={<KnowledgeBaseLandingRoute />} />
+                    <Route path="files" element={<ProjectFilesPage />} />
+                    <Route path="github" element={<ProjectGitHubPage />} />
+                  </Route>
                   <Route
                     path="/projects/:projectId/agents"
                     element={<ProjectAgentsPage />}

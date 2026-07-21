@@ -96,4 +96,4 @@ None of this is specific to RAG pipelines — the same reasoning applies to any 
 
 The uncomfortable truth about AI pipelines is that "it's not throwing errors" and "it's working correctly" are much further apart than they are for traditional software. Uptime monitoring was built for a world where correctness and availability were roughly the same problem. In AI pipelines, they're not — and the gap between them is exactly where workflow-level observability has to live.
 
-If you want to see the full instrumented stack — dashboards, metric definitions, and the OTel/Temporal wiring — it's all open source in [Aktilot's observability docs](../OBSERVABILITY.md).
+If you want to see the full instrumented stack — dashboards, metric definitions, and the OTel/Temporal wiring — it's all open source in [Aktilot's observability docs](OBSERVABILITY.md).

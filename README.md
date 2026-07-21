@@ -123,8 +123,8 @@ cp .env.example .env
 
 docker compose --profile ollama up --build
 ```
-
 The `ollama` profile starts a local Ollama server and automatically pulls the configured models on first run.
+Read [OLLAMA_SETUP.md](docs/OLLAMA_SETUP.md) for how to add Ollama to the Docker Compose file.
 
 ### Services
 
@@ -203,6 +203,11 @@ cd frontend && npm test
 | `OLLAMA_BASE_URL` | Conditional | Ollama server URL (default: `http://localhost:11434`) |
 | `UPLOAD_DIR` | No | Where uploaded files are stored (default: `uploads`) |
 | `CHROMA_DIR` | No | Where vector data is persisted (default: `chroma_data`) |
+| `GITHUB_APP_ID` | No | Enables the GitHub connector — see [GITHUB_CONNECTOR.md](docs/GITHUB_CONNECTOR.md) |
+| `GITHUB_APP_SLUG` | No | Required alongside the other `GITHUB_APP_*` vars to enable the connector |
+| `GITHUB_APP_PRIVATE_KEY` | No | The downloaded PEM, with real newlines replaced by literal `\n` |
+| `GITHUB_APP_STATE_SECRET` | No | Random secret used to HMAC-sign the `state` param carrying project identity through the install redirect |
+| `FRONTEND_BASE_URL` | No | Where the GitHub install flow redirects back to (default: `http://localhost:3000`) |
 
 Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env` (for local dev).
 
@@ -212,7 +217,15 @@ Copy `.env.example` to `.env` in the project root (for Docker) or `backend/.env`
 
 Aktilot ships with a full observability stack — metrics, traces, and 7 pre-built Grafana dashboards covering LLM performance, retrieval quality, token costs, prompt intelligence, vector database health, and Temporal workflow execution.
 
-See **[OBSERVABILITY.md](OBSERVABILITY.md)** for the full dashboard guide, metrics reference, and service URLs.
+See **[OBSERVABILITY.md](docs/OBSERVABILITY.md)** for the full dashboard guide, metrics reference, and service URLs.
+
+---
+
+## GitHub Connector
+
+Ingest an entire GitHub repository — files and issues — into a project's knowledge base, kept as a clearly separate source from uploaded documents, with per-repo manual sync.
+
+See **[GITHUB_CONNECTOR.md](docs/GITHUB_CONNECTOR.md)** for GitHub App setup, environment variables, and troubleshooting.
 
 ---
 

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
 import { Loader2, Trash2 } from "lucide-react";
 import { useProject, useDeleteProject } from "@/hooks/useApi";
-import { FilesTab } from "@/components/FilesTab";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +81,7 @@ export function ProjectDetailPage() {
         </button>
       </div>
 
-      <FilesTab projectId={project.id} />
+      <Outlet />
     </div>
   );
 }

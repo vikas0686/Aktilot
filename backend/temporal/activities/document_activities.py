@@ -151,10 +151,12 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
     chunk_dicts = [
         {
             "id": str(uuid.uuid4()),
-            "file_id": file_id,
-            "filename": filename,
-            "chunk_index": i,
             "content": text,
+            "metadata": {
+                "file_id": file_id,
+                "filename": filename,
+                "chunk_index": i,
+            },
         }
         for i, text in enumerate(chunks)
     ]

@@ -35,7 +35,7 @@ const navItemClass = (active: boolean) =>
 // Sidebar isn't inside the routed <Route> tree (it's a sibling in AppShell), so
 // it can't use useParams() — parse the project/agent context from the URL directly.
 const PROJECT_ROUTE_RE =
-  /^\/projects\/([^/]+)(?:\/agents(?:\/([^/]+)\/chat(?:\/([^/]+))?)?)?$/;
+  /^\/projects\/([^/]+)(?:\/agents(?:\/([^/]+)\/chat(?:\/([^/]+))?)?|\/(?:files|github))?$/;
 
 // ── New Project modal ─────────────────────────────────────────────────────────
 
@@ -165,7 +165,10 @@ function ProjectContextNav({
 
   const kbPath = `/projects/${projectId}`;
   const agentsPath = `/projects/${projectId}/agents`;
-  const isKbActive = location.pathname === kbPath;
+  const isKbActive =
+    location.pathname === kbPath ||
+    location.pathname === `${kbPath}/files` ||
+    location.pathname === `${kbPath}/github`;
   const isAgentsActive = location.pathname === agentsPath;
 
   return (

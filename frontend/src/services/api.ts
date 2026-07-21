@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent, PublicChatResponse } from "@/types/api";
+import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent, PublicChatResponse, GithubInstallUrl, GithubInstallation, GithubAvailableRepo, GithubConnection } from "@/types/api";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -21,6 +21,30 @@ export const projectFilesApi = {
   },
   delete: (projectId: string, fileId: string) =>
     api.delete(`/projects/${projectId}/files/${fileId}`),
+};
+
+export const githubApi = {
+  getInstallUrl: (projectId: string) =>
+    api.get<GithubInstallUrl>(`/projects/${projectId}/github/install-url`),
+  getInstallation: (projectId: string) =>
+    api.get<GithubInstallation>(`/projects/${projectId}/github/installation`),
+  disconnectInstallation: (projectId: string) =>
+    api.delete(`/projects/${projectId}/github/installation`),
+  listAvailableRepos: (projectId: string) =>
+    api.get<GithubAvailableRepo[]>(`/projects/${projectId}/github/available-repos`),
+  listConnections: (projectId: string) =>
+    api.get<GithubConnection[]>(`/projects/${projectId}/github/connections`),
+  connectRepo: (projectId: string, repoFullName: string, branch?: string) =>
+    api.post<GithubConnection>(`/projects/${projectId}/github/connections`, {
+      repo_full_name: repoFullName,
+      branch: branch ?? null,
+    }),
+  syncConnection: (projectId: string, connectionId: string) =>
+    api.post<GithubConnection>(
+      `/projects/${projectId}/github/connections/${connectionId}/sync`
+    ),
+  disconnectConnection: (projectId: string, connectionId: string) =>
+    api.delete(`/projects/${projectId}/github/connections/${connectionId}`),
 };
 
 type AgentPayload = { name?: string; description?: string; system_prompt?: string };

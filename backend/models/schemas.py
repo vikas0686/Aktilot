@@ -80,6 +80,51 @@ class FileResponse(BaseModel):
     uploaded_at: datetime
 
 
+# ── GitHub Connector ─────────────────────────────────────────────────────────
+
+
+class GithubInstallUrlResponse(BaseModel):
+    install_url: str
+
+
+class GithubInstallationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    account_login: str
+    account_type: str
+    created_at: datetime
+
+
+class GithubAvailableRepo(BaseModel):
+    full_name: str
+    default_branch: str
+    private: bool
+
+
+class GithubConnectionCreate(BaseModel):
+    repo_full_name: str
+    branch: str | None = None
+
+
+class GithubConnectionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    project_id: uuid.UUID
+    repo_full_name: str
+    default_branch: str
+    sync_status: str
+    file_count: int
+    issue_count: int
+    chunk_count: int
+    tree_truncated: bool
+    last_synced_at: datetime | None
+    error_message: str | None
+    created_at: datetime
+
+
 # ── Messages ─────────────────────────────────────────────────────────────────
 
 

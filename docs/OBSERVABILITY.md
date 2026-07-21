@@ -152,7 +152,7 @@ All custom metrics use the `rag.*` prefix and are exported via OTLP to the colle
 | `rag_workflow_*` | Temporal activities | `rag_workflow_activity_duration_ms`, `rag_workflow_retries_total` |
 | `temporal_*` | Temporal SDK | `temporal_activity_execution_latency`, `temporal_worker_task_slots_available` |
 
-Full metric definitions: [`backend/observability/metrics.py`](backend/observability/metrics.py)
+Full metric definitions: [`backend/observability/metrics.py`](../backend/observability/metrics.py)
 
 ---
 

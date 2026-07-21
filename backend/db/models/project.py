@@ -26,3 +26,9 @@ class Project(Base):
     agents: Mapped[list["Agent"]] = relationship(  # noqa: F821
         "Agent", back_populates="project", cascade="all, delete-orphan"
     )
+    github_installation: Mapped["GithubInstallation | None"] = relationship(  # noqa: F821
+        "GithubInstallation", back_populates="project", cascade="all, delete-orphan"
+    )
+    github_connections: Mapped[list["GithubConnection"]] = relationship(  # noqa: F821
+        "GithubConnection", back_populates="project", cascade="all, delete-orphan"
+    )

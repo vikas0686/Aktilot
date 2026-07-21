@@ -102,3 +102,36 @@ export interface ChunkStats {
   total_files_chunked: number;
   index_size: number;
 }
+
+export interface GithubInstallUrl {
+  install_url: string;
+}
+
+export interface GithubInstallation {
+  id: string;
+  project_id: string;
+  account_login: string;
+  account_type: string;
+  created_at: string;
+}
+
+export interface GithubAvailableRepo {
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+}
+
+export interface GithubConnection {
+  id: string;
+  project_id: string;
+  repo_full_name: string;
+  default_branch: string;
+  sync_status: "pending" | "syncing" | "synced" | "error";
+  file_count: number;
+  issue_count: number;
+  chunk_count: number;
+  tree_truncated: boolean;
+  last_synced_at: string | null;
+  error_message: string | null;
+  created_at: string;
+}
