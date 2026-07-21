@@ -10,7 +10,9 @@ from db.base import Base
 class GithubConnection(Base):
     __tablename__ = "github_connections"
     __table_args__ = (
-        sa.UniqueConstraint("project_id", "repo_full_name", name="uq_github_connection_repo"),
+        sa.UniqueConstraint(
+            "project_id", "repo_full_name", name="uq_github_connection_repo"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -46,6 +48,6 @@ class GithubConnection(Base):
     project: Mapped["Project"] = relationship(  # noqa: F821
         "Project", back_populates="github_connections"
     )
-    installation: Mapped["GithubInstallation"] = relationship(
+    installation: Mapped["GithubInstallation"] = relationship(  # noqa: F821
         "GithubInstallation", back_populates="connections"
     )

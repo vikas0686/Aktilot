@@ -85,7 +85,13 @@ class GithubSyncWorkflow:
         try:
             tree_count: int = await workflow.execute_activity(
                 fetch_repo_tree,
-                args=[connection_id, project_id, installation_id, repo_full_name, branch],
+                args=[
+                    connection_id,
+                    project_id,
+                    installation_id,
+                    repo_full_name,
+                    branch,
+                ],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=_GITHUB_RETRY,
             )

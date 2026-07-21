@@ -65,7 +65,10 @@ _LINK_NEXT_RE = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 
 async def _paginate(
-    http: httpx.AsyncClient, url: str, headers: dict[str, str], params: dict | None = None
+    http: httpx.AsyncClient,
+    url: str,
+    headers: dict[str, str],
+    params: dict | None = None,
 ) -> list[dict]:
     items: list[dict] = []
     next_url: str | None = url

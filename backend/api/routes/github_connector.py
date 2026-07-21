@@ -106,9 +106,13 @@ async def install_callback(
         )
         redirect_url = f"{settings.frontend_base_url}/projects/{project_id}/github?github=connected"
     else:
-        redirect_url = f"{settings.frontend_base_url}/projects/{project_id}/github?github=error"
+        redirect_url = (
+            f"{settings.frontend_base_url}/projects/{project_id}/github?github=error"
+        )
 
-    return RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    return RedirectResponse(
+        url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
+    )
 
 
 @router.get(
@@ -175,9 +179,7 @@ async def connect_repo(
     branch = body.branch
     if not branch:
         repos = await gh_client.list_installation_repos(token)
-        match = next(
-            (r for r in repos if r["full_name"] == body.repo_full_name), None
-        )
+        match = next((r for r in repos if r["full_name"] == body.repo_full_name), None)
         if match is None:
             raise HTTPException(
                 status_code=404,

@@ -54,15 +54,46 @@ _IGNORED_PATH_PREFIXES = (
     "target/",
 )
 _IGNORED_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp",
-    ".pdf", ".zip", ".tar", ".gz", ".7z", ".rar",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".mp4", ".mp3", ".mov", ".avi",
-    ".exe", ".dll", ".so", ".dylib", ".class", ".jar", ".bin", ".pyc",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".webp",
+    ".bmp",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".7z",
+    ".rar",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".mp4",
+    ".mp3",
+    ".mov",
+    ".avi",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".class",
+    ".jar",
+    ".bin",
+    ".pyc",
 }
 _IGNORED_FILENAMES = {
-    "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-    "Cargo.lock", "poetry.lock", "Gemfile.lock", "composer.lock",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    "poetry.lock",
+    "Gemfile.lock",
+    "composer.lock",
 }
 
 
@@ -95,7 +126,9 @@ def _issue_chunks_path(project_id: str, connection_id: str) -> Path:
 async def mark_connection_syncing(connection_id: str) -> None:
     async with AsyncSessionFactory() as db:
         result = await db.execute(
-            select(GithubConnection).where(GithubConnection.id == uuid.UUID(connection_id))
+            select(GithubConnection).where(
+                GithubConnection.id == uuid.UUID(connection_id)
+            )
         )
         record = result.scalar_one()
         record.sync_status = "syncing"
@@ -109,7 +142,9 @@ async def mark_connection_synced(
 ) -> None:
     async with AsyncSessionFactory() as db:
         result = await db.execute(
-            select(GithubConnection).where(GithubConnection.id == uuid.UUID(connection_id))
+            select(GithubConnection).where(
+                GithubConnection.id == uuid.UUID(connection_id)
+            )
         )
         record = result.scalar_one()
         record.sync_status = "synced"
@@ -124,7 +159,9 @@ async def mark_connection_synced(
 async def mark_connection_error(connection_id: str, message: str) -> None:
     async with AsyncSessionFactory() as db:
         result = await db.execute(
-            select(GithubConnection).where(GithubConnection.id == uuid.UUID(connection_id))
+            select(GithubConnection).where(
+                GithubConnection.id == uuid.UUID(connection_id)
+            )
         )
         record = result.scalar_one()
         record.sync_status = "error"
@@ -171,7 +208,9 @@ async def fetch_file_contents(
     splits into chunks, writes {path, chunk_index, content} entries to a temp file."""
     tree_file = _tree_path(project_id, connection_id)
     if not tree_file.exists():
-        raise ApplicationError(f"Repo tree file missing: {tree_file}", non_retryable=True)
+        raise ApplicationError(
+            f"Repo tree file missing: {tree_file}", non_retryable=True
+        )
     items: list[dict] = json.loads(tree_file.read_text())
 
     token = await get_installation_token(installation_id)
