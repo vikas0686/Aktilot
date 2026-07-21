@@ -84,6 +84,8 @@ const githubConnectionsKey = (projectId: string) =>
   ["github-connections", projectId] as const;
 const githubAvailableReposKey = (projectId: string) =>
   ["github-available-repos", projectId] as const;
+const githubAvailableInstallationsKey = (projectId: string) =>
+  ["github-available-installations", projectId] as const;
 
 const isGithubSyncing = (c: GithubConnection) =>
   c.sync_status === "pending" || c.sync_status === "syncing";
@@ -120,6 +122,27 @@ export function useAvailableGithubRepos(projectId: string, enabled: boolean) {
     queryKey: githubAvailableReposKey(projectId),
     queryFn: () => githubApi.listAvailableRepos(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
+  });
+}
+
+export function useAvailableGithubInstallations(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: githubAvailableInstallationsKey(projectId),
+    queryFn: () =>
+      githubApi.listAvailableInstallations(projectId).then((r) => r.data),
+    enabled: !!projectId && enabled,
+  });
+}
+
+export function useAttachGithubInstallation(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (installationId: number) =>
+      githubApi.attachInstallation(projectId, installationId).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubInstallationKey(projectId) });
+      qc.invalidateQueries({ queryKey: githubAvailableInstallationsKey(projectId) });
+    },
   });
 }
 

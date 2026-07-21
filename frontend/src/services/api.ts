@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent, PublicChatResponse, GithubInstallUrl, GithubInstallation, GithubAvailableRepo, GithubConnection } from "@/types/api";
+import type { Project, ProjectFile, Agent, AgentChatMessage, ChatSession, FileRecord, ChatResponse, ChunkStats, ShareLink, PublicAgent, PublicChatResponse, GithubInstallUrl, GithubInstallation, GithubAvailableRepo, GithubConnection, GithubReusableInstallation } from "@/types/api";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -30,6 +30,15 @@ export const githubApi = {
     api.get<GithubInstallation>(`/projects/${projectId}/github/installation`),
   disconnectInstallation: (projectId: string) =>
     api.delete(`/projects/${projectId}/github/installation`),
+  listAvailableInstallations: (projectId: string) =>
+    api.get<GithubReusableInstallation[]>(
+      `/projects/${projectId}/github/available-installations`
+    ),
+  attachInstallation: (projectId: string, installationId: number) =>
+    api.post<GithubInstallation>(
+      `/projects/${projectId}/github/attach-installation`,
+      { installation_id: installationId }
+    ),
   listAvailableRepos: (projectId: string) =>
     api.get<GithubAvailableRepo[]>(`/projects/${projectId}/github/available-repos`),
   listConnections: (projectId: string) =>

@@ -6,6 +6,8 @@ import {
   useGithubInstallUrl,
   useGithubConnections,
   useAvailableGithubRepos,
+  useAvailableGithubInstallations,
+  useAttachGithubInstallation,
   useConnectGithubRepo,
   useSyncGithubConnection,
   useDisconnectGithubConnection,
@@ -220,6 +222,12 @@ export function GitHubTab({ projectId }: { projectId: string }) {
     useGithubConnections(projectId);
   const installUrl = useGithubInstallUrl(projectId);
   const disconnectInstallation = useDisconnectGithubInstallation(projectId);
+  const needsInstallation = !installationLoading && (notInstalled || !installation);
+  const { data: availableInstallations } = useAvailableGithubInstallations(
+    projectId,
+    needsInstallation
+  );
+  const attachInstallation = useAttachGithubInstallation(projectId);
 
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -293,6 +301,44 @@ export function GitHubTab({ projectId }: { projectId: string }) {
             </Button>
           }
         />
+        {availableInstallations && availableInstallations.length > 0 && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-medium">Or reuse an existing connection</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              These GitHub accounts are already connected to other projects.
+              GitHub doesn't always redirect back here if the App is already
+              installed on an account, so this attaches it directly instead.
+            </p>
+            <ul className="mt-3 space-y-1.5">
+              {availableInstallations.map((inst) => {
+                const isAttaching =
+                  attachInstallation.isPending &&
+                  attachInstallation.variables === inst.installation_id;
+                return (
+                  <li key={inst.installation_id}>
+                    <button
+                      onClick={() =>
+                        attachInstallation.mutate(inst.installation_id)
+                      }
+                      disabled={attachInstallation.isPending}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-muted/40 disabled:opacity-50"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Github className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        {inst.account_login}
+                      </span>
+                      {isAttaching ? (
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                      ) : (
+                        <Badge variant="secondary">Use this</Badge>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }
