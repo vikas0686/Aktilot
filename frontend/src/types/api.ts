@@ -121,6 +121,12 @@ export interface GithubAvailableRepo {
   private: boolean;
 }
 
+export interface GithubReusableInstallation {
+  installation_id: number;
+  account_login: string;
+  account_type: string;
+}
+
 export interface GithubConnection {
   id: string;
   project_id: string;

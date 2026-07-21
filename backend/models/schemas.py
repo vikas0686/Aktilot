@@ -103,6 +103,16 @@ class GithubAvailableRepo(BaseModel):
     private: bool
 
 
+class GithubReusableInstallation(BaseModel):
+    installation_id: int
+    account_login: str
+    account_type: str
+
+
+class GithubAttachInstallationRequest(BaseModel):
+    installation_id: int
+
+
 class GithubConnectionCreate(BaseModel):
     repo_full_name: str
     branch: str | None = None

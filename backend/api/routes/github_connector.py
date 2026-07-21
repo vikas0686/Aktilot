@@ -12,11 +12,13 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from config import settings
 from db.session import get_db
 from models.schemas import (
+    GithubAttachInstallationRequest,
     GithubAvailableRepo,
     GithubConnectionCreate,
     GithubConnectionResponse,
     GithubInstallationResponse,
     GithubInstallUrlResponse,
+    GithubReusableInstallation,
 )
 from services import (
     github_connection_service,
@@ -142,6 +144,65 @@ async def get_installation_status(
     return await github_installation_service.require_for_project(db, project_id)
 
 
+@router.get(
+    "/{project_id}/github/available-installations",
+    response_model=list[GithubReusableInstallation],
+)
+async def list_available_installations(
+    project_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+):
+    """GitHub installations already connected to *other* projects that this
+    project could attach to directly — a workaround for GitHub Apps not
+    reliably redirecting through the Setup URL when an account is already
+    installed, which makes the normal install flow a dead end for a second
+    project on the same account."""
+    await project_service.get(db, project_id)
+    installations = await github_installation_service.list_reusable_for_project(
+        db, project_id
+    )
+    return [
+        GithubReusableInstallation(
+            installation_id=i.installation_id,
+            account_login=i.account_login,
+            account_type=i.account_type,
+        )
+        for i in installations
+    ]
+
+
+@router.post(
+    "/{project_id}/github/attach-installation",
+    response_model=GithubInstallationResponse,
+)
+async def attach_installation(
+    project_id: uuid.UUID,
+    body: GithubAttachInstallationRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Links this project directly to a GitHub installation another project
+    already has, without going through GitHub's install redirect."""
+    await project_service.get(db, project_id)
+    reusable = await github_installation_service.list_reusable_for_project(
+        db, project_id
+    )
+    match = next(
+        (i for i in reusable if i.installation_id == body.installation_id), None
+    )
+    if match is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No known installation with that ID is available to attach",
+        )
+
+    return await github_installation_service.upsert(
+        db,
+        project_id=project_id,
+        installation_id=match.installation_id,
+        account_login=match.account_login,
+        account_type=match.account_type,
+    )
+
+
 @router.delete(
     "/{project_id}/github/installation",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -154,14 +215,24 @@ async def disconnect_installation(
     for connection in connections:
         chroma_delete_by_repo(str(project_id), str(connection.id))
 
-    try:
-        await gh_client.uninstall_app(installation.installation_id)
-    except Exception:
-        logger.exception(
-            "failed to uninstall GitHub App for installation_id=%s; "
-            "local records are removed regardless",
+    shared = await github_installation_service.is_installation_id_used_elsewhere(
+        db, installation.installation_id, excluding_project_id=project_id
+    )
+    if shared:
+        logger.info(
+            "installation_id=%s is still used by another project; skipping "
+            "GitHub-side uninstall, only removing this project's link",
             installation.installation_id,
         )
+    else:
+        try:
+            await gh_client.uninstall_app(installation.installation_id)
+        except Exception:
+            logger.exception(
+                "failed to uninstall GitHub App for installation_id=%s; "
+                "local records are removed regardless",
+                installation.installation_id,
+            )
 
     await github_installation_service.delete(db, installation)
 
