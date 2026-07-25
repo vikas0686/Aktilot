@@ -148,9 +148,12 @@ async def embed_and_index_chunks(project_id: str, file_id: str) -> int:
         m.workflow_retries_total.add(1, {**attrs, "error_type": "UNKNOWN"})
 
     # ── Index to ChromaDB ─────────────────────────────────────────────────────
+    # Deterministic IDs (not uuid4) so a Temporal retry of this activity
+    # upserts the same chunks instead of duplicating them — mirrors the
+    # pattern used by embed_and_index_github_chunks.
     chunk_dicts = [
         {
-            "id": str(uuid.uuid4()),
+            "id": f"{file_id}:{i}",
             "content": text,
             "metadata": {
                 "file_id": file_id,
