@@ -10,7 +10,7 @@ import logging
 
 from config import settings
 from db.session import AsyncSessionFactory
-from services import session_service
+from services import session_service, upload_sweeper
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,13 @@ async def run_forever() -> None:
                     logger.info(
                         "retention sweep: purged %d expired visitor session(s)",
                         deleted,
+                    )
+
+                swept = await upload_sweeper.sweep_orphaned_uploads(db)
+                if swept:
+                    logger.info(
+                        "retention sweep: removed %d orphaned upload item(s)",
+                        swept,
                     )
         except asyncio.CancelledError:
             raise
