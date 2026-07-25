@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
+from api.pagination import LimitParam, OffsetParam
 from config import settings
 from db.session import get_db
 from models.schemas import (
@@ -315,9 +316,16 @@ async def connect_repo(
     "/{project_id}/github/connections",
     response_model=list[GithubConnectionResponse],
 )
-async def list_connections(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def list_connections(
+    project_id: uuid.UUID,
+    limit: LimitParam = 100,
+    offset: OffsetParam = 0,
+    db: AsyncSession = Depends(get_db),
+):
     await project_service.get(db, project_id)
-    return await github_connection_service.list_for_project(db, project_id)
+    return await github_connection_service.list_for_project(
+        db, project_id, limit=limit, offset=offset
+    )
 
 
 @router.post(

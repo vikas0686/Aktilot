@@ -31,11 +31,15 @@ async def create(
     return agent
 
 
-async def list_for_project(db: AsyncSession, project_id: uuid.UUID) -> list[Agent]:
+async def list_for_project(
+    db: AsyncSession, project_id: uuid.UUID, limit: int = 100, offset: int = 0
+) -> list[Agent]:
     result = await db.execute(
         select(Agent)
         .where(Agent.project_id == project_id)
         .order_by(Agent.created_at.asc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 

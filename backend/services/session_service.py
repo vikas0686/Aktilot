@@ -24,7 +24,9 @@ async def create(db: AsyncSession, agent_id: uuid.UUID) -> ChatSession:
     return session
 
 
-async def list_for_agent(db: AsyncSession, agent_id: uuid.UUID) -> list[ChatSession]:
+async def list_for_agent(
+    db: AsyncSession, agent_id: uuid.UUID, limit: int = 100, offset: int = 0
+) -> list[ChatSession]:
     """Sessions visible in the authenticated admin app only.
 
     Anonymous visitor sessions are excluded — no admin/creator view is ever
@@ -34,6 +36,8 @@ async def list_for_agent(db: AsyncSession, agent_id: uuid.UUID) -> list[ChatSess
         select(ChatSession)
         .where(ChatSession.agent_id == agent_id, ChatSession.visitor_id.is_(None))
         .order_by(ChatSession.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 

@@ -5,6 +5,7 @@ import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.pagination import LimitParam, OffsetParam
 from config import project_upload_dir
 from db.session import get_db
 from models.schemas import FileResponse
@@ -67,9 +68,16 @@ async def upload_file(
 
 
 @router.get("/{project_id}/files", response_model=list[FileResponse])
-async def list_files(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def list_files(
+    project_id: uuid.UUID,
+    limit: LimitParam = 200,
+    offset: OffsetParam = 0,
+    db: AsyncSession = Depends(get_db),
+):
     await project_service.get(db, project_id)
-    return await project_file_service.list_for_project(db, project_id)
+    return await project_file_service.list_for_project(
+        db, project_id, limit=limit, offset=offset
+    )
 
 
 @router.delete(

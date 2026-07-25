@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.pagination import LimitParam, OffsetParam
 from db.session import get_db
 from models.schemas import ProjectCreate, ProjectResponse
 from services import project_service
@@ -16,8 +17,12 @@ async def create_project(body: ProjectCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.get("", response_model=list[ProjectResponse])
-async def list_projects(db: AsyncSession = Depends(get_db)):
-    return await project_service.list_all(db)
+async def list_projects(
+    limit: LimitParam = 100,
+    offset: OffsetParam = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    return await project_service.list_all(db, limit=limit, offset=offset)
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
