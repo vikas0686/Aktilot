@@ -25,7 +25,13 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt ruff
+        # ruff is pinned (unlike requirements.txt's runtime deps) because an
+        # unpinned install broke this job before: ruff 0.16.0 turned on new
+        # default rules (flake8-bugbear, pyupgrade) that flagged dozens of
+        # pre-existing, unrelated violations across the codebase the moment
+        # it was released — see docs/enterprise-readiness-findings.md's note
+        # on unpinned dependencies making builds non-reproducible.
+        run: pip install -r requirements.txt ruff==0.15.22
 
       - name: Lint (ruff)
         run: ruff check .
