@@ -281,7 +281,9 @@ async def test_get_installation_status_happy_path(client, db_session):
 # ── GET .../available-installations & POST .../attach-installation ──────────
 
 
-async def test_available_installations_excludes_own_and_deduplicates(client, db_session):
+async def test_available_installations_excludes_own_and_deduplicates(
+    client, db_session
+):
     pid_a = await _create_project(client, "A")
     pid_b = await _create_project(client, "B")
     pid_c = await _create_project(client, "C")
@@ -615,9 +617,7 @@ async def test_connect_repo_workflow_start_failure_marks_error_and_returns_502(
 async def test_sync_connection_not_found_returns_404(client, db_session):
     pid = await _create_project(client)
     await _create_installation(db_session, pid)
-    r = await client.post(
-        f"/api/projects/{pid}/github/connections/{uuid.uuid4()}/sync"
-    )
+    r = await client.post(f"/api/projects/{pid}/github/connections/{uuid.uuid4()}/sync")
     assert r.status_code == 404
 
 
@@ -671,9 +671,7 @@ async def test_sync_connection_already_in_progress_returns_409(client, db_sessio
 
 async def test_disconnect_repo_not_found_returns_404(client):
     pid = await _create_project(client)
-    r = await client.delete(
-        f"/api/projects/{pid}/github/connections/{uuid.uuid4()}"
-    )
+    r = await client.delete(f"/api/projects/{pid}/github/connections/{uuid.uuid4()}")
     assert r.status_code == 404
 
 

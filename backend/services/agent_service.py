@@ -37,7 +37,7 @@ async def list_for_project(
     result = await db.execute(
         select(Agent)
         .where(Agent.project_id == project_id)
-        .order_by(Agent.created_at.asc())
+        .order_by(Agent.created_at.asc(), Agent.id.asc())
         .limit(limit)
         .offset(offset)
     )

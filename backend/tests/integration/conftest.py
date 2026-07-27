@@ -359,9 +359,7 @@ def chroma_github_mock(monkeypatch: pytest.MonkeyPatch):
     def _delete_by_repo(project_id, connection_id):
         state["deleted"].append((project_id, connection_id))
 
-    monkeypatch.setattr(
-        "temporal.activities.github_activities.add_chunks", _add_chunks
-    )
+    monkeypatch.setattr("temporal.activities.github_activities.add_chunks", _add_chunks)
     monkeypatch.setattr(
         "temporal.activities.github_activities.chroma_delete_by_repo",
         _delete_by_repo,

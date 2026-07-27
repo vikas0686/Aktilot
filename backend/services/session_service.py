@@ -35,7 +35,7 @@ async def list_for_agent(
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.agent_id == agent_id, ChatSession.visitor_id.is_(None))
-        .order_by(ChatSession.updated_at.desc())
+        .order_by(ChatSession.updated_at.desc(), ChatSession.id.desc())
         .limit(limit)
         .offset(offset)
     )

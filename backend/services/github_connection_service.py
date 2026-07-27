@@ -53,7 +53,7 @@ async def list_for_project(
     result = await db.execute(
         select(GithubConnection)
         .where(GithubConnection.project_id == project_id)
-        .order_by(GithubConnection.created_at.desc())
+        .order_by(GithubConnection.created_at.desc(), GithubConnection.id.desc())
         .limit(limit)
         .offset(offset)
     )

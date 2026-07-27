@@ -24,6 +24,7 @@ import uuid
 import pytest
 from temporalio.client import WorkflowFailureError
 
+from db.models.github_connection import GithubConnection
 from db.models.github_installation import GithubInstallation
 from temporal.workflows.github_sync_workflow import GithubSyncWorkflow
 from tests.integration.conftest import ScriptedProvider
@@ -147,15 +148,15 @@ async def test_github_sync_workflow_runs_end_to_end(
     assert chroma_github_mock["deleted"] == [(pid, connection_id)]
 
 
-async def test_github_sync_workflow_marks_syncing_before_fetching(
-    github_worker, temporal_env, task_queue, db_session, github_api_mock
+async def test_github_sync_workflow_transitions_through_syncing_before_fetching(
+    github_worker, temporal_env, task_queue, db_session, github_api_mock, monkeypatch
 ):
     """The workflow's first step (mark_connection_syncing) must run and
-    commit before the (slower) fetch steps — checked by executing the
-    workflow directly against a pre-seeded connection row and inspecting
-    intermediate state isn't needed here; instead this asserts the terminal
-    state reflects a real transition through 'syncing', not just 'pending'
-    jumping straight to 'synced'."""
+    commit before the fetch steps run — observed here by capturing the
+    connection's sync_status at the exact moment fetch_repo_tree calls the
+    (mocked) GitHub API, not just by checking the terminal 'synced' state
+    (which the happy-path test already covers and wouldn't catch a
+    reordering bug where fetching started before the syncing commit)."""
     project_id = uuid.uuid4()
     installation = GithubInstallation(
         project_id=project_id,
@@ -167,8 +168,6 @@ async def test_github_sync_workflow_marks_syncing_before_fetching(
     await db_session.commit()
     await db_session.refresh(installation)
 
-    from db.models.github_connection import GithubConnection
-
     connection = GithubConnection(
         project_id=project_id,
         installation_id=installation.id,
@@ -179,6 +178,18 @@ async def test_github_sync_workflow_marks_syncing_before_fetching(
     db_session.add(connection)
     await db_session.commit()
     await db_session.refresh(connection)
+
+    observed = {}
+
+    async def _observing_get_tree(token, repo_full_name, branch):
+        await db_session.refresh(connection)
+        observed["status_at_fetch"] = connection.sync_status
+        return TREE, False
+
+    monkeypatch.setattr(
+        "temporal.activities.github_activities.gh_client.get_tree",
+        _observing_get_tree,
+    )
 
     await temporal_env.client.execute_workflow(
         GithubSyncWorkflow.run,
@@ -194,6 +205,7 @@ async def test_github_sync_workflow_marks_syncing_before_fetching(
         task_queue=task_queue,
     )
 
+    assert observed["status_at_fetch"] == "syncing"
     await db_session.refresh(connection)
     assert connection.sync_status == "synced"
 

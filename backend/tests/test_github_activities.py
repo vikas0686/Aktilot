@@ -210,9 +210,7 @@ async def test_fetch_repo_tree_reports_truncated(tmp_path, monkeypatch):
         ),
         patch(
             "temporal.activities.github_activities.gh_client.get_tree",
-            AsyncMock(
-                return_value=([{"path": "a.py", "sha": "s", "size": 1}], True)
-            ),
+            AsyncMock(return_value=([{"path": "a.py", "sha": "s", "size": 1}], True)),
         ),
     ):
         result = await fetch_repo_tree(CONNECTION_ID, "proj1", 999, "acme/repo", "main")
@@ -414,7 +412,9 @@ async def test_fetch_issues_happy_path_with_comments(tmp_path, monkeypatch):
         count = await _env.run(fetch_issues, CONNECTION_ID, "proj1", 999, "acme/repo")
 
     assert count == 2
-    mock_comments.assert_called_once_with("tok", "acme/repo", 1)  # only issue 1 has comments
+    mock_comments.assert_called_once_with(
+        "tok", "acme/repo", 1
+    )  # only issue 1 has comments
     out = _issue_chunks_path("proj1", CONNECTION_ID)
     chunks = json.loads(out.read_text())
     assert {c["path"] for c in chunks} == {"issues/1", "issues/2"}
@@ -504,9 +504,7 @@ async def test_embed_and_index_github_chunks_happy_path(tmp_path, monkeypatch):
     factory = _embed_factory([[0.1], [0.2]])
 
     with (
-        patch(
-            "temporal.activities.github_activities.get_embedding_provider", factory
-        ),
+        patch("temporal.activities.github_activities.get_embedding_provider", factory),
         patch("temporal.activities.github_activities.add_chunks") as mock_add,
     ):
         count = await _env.run(
@@ -615,7 +613,9 @@ async def test_embed_and_index_github_chunks_provider_not_available_raises_non_r
         [{"path": "a.py", "chunk_index": 0, "content": "x"}],
     )
     provider = MagicMock()
-    provider.embed = AsyncMock(side_effect=ProviderNotAvailableError("unknown provider"))
+    provider.embed = AsyncMock(
+        side_effect=ProviderNotAvailableError("unknown provider")
+    )
 
     with patch(
         "temporal.activities.github_activities.get_embedding_provider",

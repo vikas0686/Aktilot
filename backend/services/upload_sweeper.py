@@ -58,11 +58,19 @@ async def sweep_orphaned_uploads(db: AsyncSession) -> int:
 
         if project_dir.name not in project_ids:
             if _older_than_grace_period(project_dir, grace_minutes):
-                shutil.rmtree(project_dir, ignore_errors=True)
-                removed += 1
-                logger.info(
-                    "upload sweep: removed orphaned project dir %s", project_dir.name
-                )
+                try:
+                    shutil.rmtree(project_dir)
+                except OSError:
+                    logger.exception(
+                        "upload sweep: failed to remove orphaned project dir %s",
+                        project_dir.name,
+                    )
+                else:
+                    removed += 1
+                    logger.info(
+                        "upload sweep: removed orphaned project dir %s",
+                        project_dir.name,
+                    )
             continue
 
         try:
@@ -84,8 +92,12 @@ async def sweep_orphaned_uploads(db: AsyncSession) -> int:
                 continue
             file_id = f.name.split("_", 1)[0]
             if file_id not in file_ids and _older_than_grace_period(f, grace_minutes):
-                f.unlink(missing_ok=True)
-                removed += 1
-                logger.info("upload sweep: removed orphaned file %s", f)
+                try:
+                    f.unlink()
+                except FileNotFoundError:
+                    pass  # removed concurrently — not a sweep failure
+                else:
+                    removed += 1
+                    logger.info("upload sweep: removed orphaned file %s", f)
 
     return removed

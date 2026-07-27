@@ -2,9 +2,8 @@ import asyncio
 import contextlib
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
@@ -20,7 +19,7 @@ from api.routes import (
 )
 from config import settings
 from db.session import engine
-from middleware import MaxBodySizeMiddleware, RateLimitMiddleware, RequestEntityTooLarge
+from middleware import MaxBodySizeMiddleware, RateLimitMiddleware
 from observability.otel import configure_otel
 from services import retention_sweeper
 from temporal.client import close_temporal_client, init_temporal_client
@@ -57,16 +56,7 @@ app.add_middleware(
     max_requests=settings.rate_limit_max_requests,
     window_seconds=settings.rate_limit_window_seconds,
 )
-app.add_middleware(
-    MaxBodySizeMiddleware, max_body_size=settings.max_request_body_bytes
-)
-
-
-@app.exception_handler(RequestEntityTooLarge)
-async def handle_request_entity_too_large(
-    request: Request, exc: RequestEntityTooLarge
-) -> JSONResponse:
-    return JSONResponse(status_code=413, content={"detail": str(exc)})
+app.add_middleware(MaxBodySizeMiddleware, max_body_size=settings.max_request_body_bytes)
 
 app.include_router(projects.router)
 app.include_router(project_files.router)

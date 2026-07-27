@@ -28,6 +28,10 @@ def _backdate(path, minutes_ago: float) -> None:
 @pytest.fixture(autouse=True)
 def _upload_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "upload_dir", tmp_path)
+    # Paths in these tests are backdated relative to GRACE_MINUTES, so the
+    # sweeper must use that same value — not whatever grace period a
+    # non-default environment happens to have configured.
+    monkeypatch.setattr(settings, "upload_orphan_grace_minutes", GRACE_MINUTES)
     return tmp_path
 
 

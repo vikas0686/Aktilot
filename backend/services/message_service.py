@@ -43,7 +43,7 @@ async def list_for_agent(
             Message.agent_id == agent_id,
             or_(Message.session_id.is_(None), ChatSession.visitor_id.is_(None)),
         )
-        .order_by(Message.created_at.desc())
+        .order_by(Message.created_at.desc(), Message.id.desc())
         .limit(limit)
         .offset(offset)
     )
@@ -60,7 +60,7 @@ async def list_for_session(
     result = await db.execute(
         select(Message)
         .where(Message.session_id == session_id)
-        .order_by(Message.created_at.desc())
+        .order_by(Message.created_at.desc(), Message.id.desc())
         .limit(limit)
         .offset(offset)
     )

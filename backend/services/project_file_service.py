@@ -37,7 +37,7 @@ async def list_for_project(
     result = await db.execute(
         select(File)
         .where(File.project_id == project_id)
-        .order_by(File.uploaded_at.desc())
+        .order_by(File.uploaded_at.desc(), File.id.desc())
         .limit(limit)
         .offset(offset)
     )

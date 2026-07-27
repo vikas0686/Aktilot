@@ -9,13 +9,17 @@ so there is no multi-instance deployment to coordinate across yet. If that
 changes, these should move to a shared store instead.
 """
 
+import json
+import math
 import time
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
 class RequestEntityTooLarge(Exception):
-    """Raised when a request body exceeds the configured maximum size."""
+    """Internal signal raised by limited_receive() when a streamed body
+    crosses the limit — caught by __call__ itself, never propagated to the
+    ASGI app (see MaxBodySizeMiddleware's docstring for why)."""
 
 
 def _get_header(scope: Scope, name: bytes) -> bytes | None:
@@ -34,6 +38,14 @@ class MaxBodySizeMiddleware:
     bytes as they arrive and abort as soon as the running total crosses the
     limit, so a client can't bypass the check by simply omitting or
     understating Content-Length.
+
+    The 413 response is written directly by this middleware rather than via
+    FastAPI's @app.exception_handler mechanism: this middleware is added
+    last, which in Starlette's stack makes it the *outermost* user
+    middleware — above (outside) ExceptionMiddleware, which is what actually
+    dispatches registered exception handlers. An exception raised here would
+    otherwise propagate past ExceptionMiddleware entirely and surface as a
+    generic unhandled 500, not the intended 413.
     """
 
     def __init__(self, app: ASGIApp, max_body_size: int) -> None:
@@ -52,10 +64,16 @@ class MaxBodySizeMiddleware:
             except ValueError:
                 declared_size = 0
             if declared_size > self.max_body_size:
-                raise RequestEntityTooLarge(
-                    f"Request body ({declared_size} bytes) exceeds the "
-                    f"{self.max_body_size}-byte limit"
-                )
+                await self._reject(send)
+                return
+
+        response_started = False
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
 
         total_bytes = 0
 
@@ -70,7 +88,27 @@ class MaxBodySizeMiddleware:
                     )
             return message
 
-        await self.app(scope, limited_receive, send)
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except RequestEntityTooLarge:
+            if response_started:
+                # The app already started responding before the body was
+                # fully read (unusual) — too late to send a fresh 413.
+                raise
+            await self._reject(send)
+
+    async def _reject(self, send: Send) -> None:
+        body = json.dumps(
+            {"detail": f"Request body exceeds the {self.max_body_size}-byte limit"}
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [(b"content-type", b"application/json")],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
 
 
 class RateLimitMiddleware:
@@ -80,7 +118,10 @@ class RateLimitMiddleware:
     max_requests per window_seconds; the window resets on the first request
     after it elapses. Tracked-client state is pruned once it grows past
     _MAX_TRACKED_CLIENTS to bound memory instead of growing forever as new
-    IPs show up.
+    IPs show up. If every tracked entry is still fresh (nothing to prune) —
+    e.g. a sustained stream of unique client IPs — the oldest entry is
+    evicted instead, so _MAX_TRACKED_CLIENTS stays a hard bound rather than
+    just a pruning trigger.
     """
 
     _MAX_TRACKED_CLIENTS = 10_000
@@ -106,8 +147,14 @@ class RateLimitMiddleware:
         key = client[0] if client else "unknown"
         now = time.monotonic()
 
-        if len(self._counts) >= self._MAX_TRACKED_CLIENTS:
+        if len(self._counts) >= self._MAX_TRACKED_CLIENTS and key not in self._counts:
             self._prune_stale(now)
+            if len(self._counts) >= self._MAX_TRACKED_CLIENTS:
+                # Still at capacity even after pruning — every tracked entry
+                # is fresh (e.g. a sustained stream of unique client IPs).
+                # Evict the oldest to keep this a hard bound rather than
+                # growing without limit; dicts preserve insertion order.
+                del self._counts[next(iter(self._counts))]
 
         count, window_start = self._counts.get(key, (0, now))
         if now - window_start >= self.window_seconds:
@@ -116,7 +163,10 @@ class RateLimitMiddleware:
         self._counts[key] = (count, window_start)
 
         if count > self.max_requests:
-            retry_after = max(0, round(self.window_seconds - (now - window_start)))
+            # Ceiling, not round — rounding down to 0 while time still
+            # remains in the window would invite an immediate retry that
+            # gets rejected again.
+            retry_after = max(0, math.ceil(self.window_seconds - (now - window_start)))
             await send(
                 {
                     "type": "http.response.start",
