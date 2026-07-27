@@ -204,8 +204,45 @@ async def test_embed_and_index_chunks_happy_path(tmp_path, monkeypatch):
     )
     assert call_args.args[2] == [[0.1], [0.2], [0.3]]
 
+    # IDs are deterministic (file_id:chunk_index), not random uuid4 — required
+    # so a Temporal retry upserts the same records instead of duplicating them.
+    assert [c["id"] for c in chunk_dicts] == ["f1:0", "f1:1", "f1:2"]
+
     # temp chunks file is cleaned up after a successful run
     assert not out.exists()
+
+
+async def test_embed_and_index_chunks_retry_produces_identical_ids(
+    tmp_path, monkeypatch
+):
+    """Simulates a Temporal retry: the activity is run twice against the same
+    file_id/chunks. Chunk IDs must be identical across runs so add_chunks'
+    upsert overwrites the prior attempt's records instead of creating
+    duplicates alongside them."""
+    chunks = ["a", "b", "c"]
+    factory = _embed_factory([[0.1], [0.2], [0.3]])
+
+    seen_id_batches = []
+
+    def _capture_add(project_id, chunk_dicts, embeddings):
+        seen_id_batches.append([c["id"] for c in chunk_dicts])
+
+    for attempt in range(2):
+        _write_chunks_file(tmp_path, monkeypatch, "proj1", "f1", chunks)
+        with (
+            patch(
+                "temporal.activities.document_activities.get_embedding_provider",
+                factory,
+            ),
+            patch(
+                "temporal.activities.document_activities.add_chunks",
+                side_effect=_capture_add,
+            ),
+        ):
+            await _env.run(embed_and_index_chunks, "proj1", "f1")
+
+    assert len(seen_id_batches) == 2
+    assert seen_id_batches[0] == seen_id_batches[1] == ["f1:0", "f1:1", "f1:2"]
 
 
 async def test_embed_and_index_chunks_missing_file_raises_non_retryable(

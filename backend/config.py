@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     share_default_daily_message_cap: int = Field(default=200, gt=0)
     share_visitor_retention_days: int = Field(default=7, gt=0)
     share_retention_sweep_interval_seconds: int = Field(default=3600, gt=0)
+    # orphaned upload files (disk state with no matching DB record)
+    upload_orphan_grace_minutes: int = Field(default=60, gt=0)
+    # request/abuse guardrails
+    max_request_body_bytes: int = Field(default=50 * 1024 * 1024, gt=0)  # 50 MB
+    rate_limit_max_requests: int = Field(default=300, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
     # github connector
     github_app_id: str = ""
     github_app_slug: str = ""

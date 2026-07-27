@@ -17,7 +17,9 @@ from api.routes import (
     projects,
     public_chat,
 )
+from config import settings
 from db.session import engine
+from middleware import MaxBodySizeMiddleware, RateLimitMiddleware
 from observability.otel import configure_otel
 from services import retention_sweeper
 from temporal.client import close_temporal_client, init_temporal_client
@@ -49,6 +51,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=settings.rate_limit_max_requests,
+    window_seconds=settings.rate_limit_window_seconds,
+)
+app.add_middleware(MaxBodySizeMiddleware, max_body_size=settings.max_request_body_bytes)
 
 app.include_router(projects.router)
 app.include_router(project_files.router)

@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.pagination import LimitParam, OffsetParam
 from db.session import get_db
 from models.schemas import AgentCreate, AgentResponse, AgentUpdate
 from services import agent_service, project_service
@@ -31,9 +32,16 @@ async def create_agent(
 
 
 @project_router.get("/{project_id}/agents", response_model=list[AgentResponse])
-async def list_agents(project_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def list_agents(
+    project_id: uuid.UUID,
+    limit: LimitParam = 100,
+    offset: OffsetParam = 0,
+    db: AsyncSession = Depends(get_db),
+):
     await project_service.get(db, project_id)
-    return await agent_service.list_for_project(db, project_id)
+    return await agent_service.list_for_project(
+        db, project_id, limit=limit, offset=offset
+    )
 
 
 @agent_router.get("/{agent_id}", response_model=AgentResponse)

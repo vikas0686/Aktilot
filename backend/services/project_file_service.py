@@ -31,11 +31,15 @@ async def create(
     return record
 
 
-async def list_for_project(db: AsyncSession, project_id: uuid.UUID) -> list[File]:
+async def list_for_project(
+    db: AsyncSession, project_id: uuid.UUID, limit: int = 200, offset: int = 0
+) -> list[File]:
     result = await db.execute(
         select(File)
         .where(File.project_id == project_id)
-        .order_by(File.uploaded_at.desc())
+        .order_by(File.uploaded_at.desc(), File.id.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 

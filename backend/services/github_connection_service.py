@@ -48,12 +48,14 @@ async def create(
 
 
 async def list_for_project(
-    db: AsyncSession, project_id: uuid.UUID
+    db: AsyncSession, project_id: uuid.UUID, limit: int = 100, offset: int = 0
 ) -> list[GithubConnection]:
     result = await db.execute(
         select(GithubConnection)
         .where(GithubConnection.project_id == project_id)
-        .order_by(GithubConnection.created_at.desc())
+        .order_by(GithubConnection.created_at.desc(), GithubConnection.id.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all())
 

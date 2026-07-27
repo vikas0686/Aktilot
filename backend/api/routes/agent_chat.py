@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ActivityError, ApplicationError
 
+from api.pagination import MessageLimitParam, OffsetParam
 from db.session import get_db
 from models.schemas import (
     ChatRequest,
@@ -90,6 +91,13 @@ async def chat(
 
 
 @router.get("/{agent_id}/messages", response_model=list[MessageResponse])
-async def get_messages(agent_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_messages(
+    agent_id: uuid.UUID,
+    limit: MessageLimitParam = 200,
+    offset: OffsetParam = 0,
+    db: AsyncSession = Depends(get_db),
+):
     await agent_service.get(db, agent_id)  # 404 if agent missing
-    return await message_service.list_for_agent(db, agent_id)
+    return await message_service.list_for_agent(
+        db, agent_id, limit=limit, offset=offset
+    )

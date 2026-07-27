@@ -30,9 +30,13 @@ def add_chunks(
     chunks: list of {id, content, metadata}. `metadata` is stored as-is on the
     Chroma record, so callers (uploads, GitHub connector, ...) each decide what
     to tag their chunks with (file_id/filename vs repo_id/repo_full_name/path).
+
+    Uses upsert (not add) so callers that pass deterministic chunk IDs are
+    idempotent under retry — re-running with the same IDs overwrites the
+    existing records instead of erroring or duplicating them.
     """
     collection = get_collection(project_id)
-    collection.add(
+    collection.upsert(
         ids=[c["id"] for c in chunks],
         embeddings=embeddings,
         documents=[c["content"] for c in chunks],

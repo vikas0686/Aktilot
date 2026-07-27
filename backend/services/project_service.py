@@ -18,8 +18,15 @@ async def create(db: AsyncSession, name: str, description: str | None) -> Projec
     return project
 
 
-async def list_all(db: AsyncSession) -> list[Project]:
-    result = await db.execute(select(Project).order_by(Project.created_at.desc()))
+async def list_all(
+    db: AsyncSession, limit: int = 100, offset: int = 0
+) -> list[Project]:
+    result = await db.execute(
+        select(Project)
+        .order_by(Project.created_at.desc(), Project.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     return list(result.scalars().all())
 
 

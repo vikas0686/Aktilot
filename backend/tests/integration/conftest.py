@@ -34,9 +34,10 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from services.llm.base import ChatResult, EmbedResult
-from temporal.activities import chat_activities, document_activities
+from temporal.activities import chat_activities, document_activities, github_activities
 from temporal.workflows.chat_workflow import ChatWorkflow
 from temporal.workflows.document_workflow import DocumentWorkflow
+from temporal.workflows.github_sync_workflow import GithubSyncWorkflow
 
 pytestmark = pytest.mark.integration
 
@@ -328,4 +329,99 @@ async def document_integration_client(
         "api.routes.project_files.get_temporal_client", _fake_get_client
     )
     monkeypatch.setattr("api.routes.project_files.TASK_QUEUE", task_queue)
+    return client
+
+
+# ── GithubSyncWorkflow fixtures ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def github_embedding_provider(monkeypatch: pytest.MonkeyPatch) -> ScriptedProvider:
+    """github_activities.py imports get_embedding_provider independently of
+    document_activities.py — a separate module-level name needs its own patch."""
+    provider = ScriptedProvider([embed_result()])
+    monkeypatch.setattr(
+        "temporal.activities.github_activities.get_embedding_provider",
+        lambda *a, **kw: provider,
+    )
+    return provider
+
+
+@pytest.fixture
+def chroma_github_mock(monkeypatch: pytest.MonkeyPatch):
+    """Records add_chunks/delete_by_repo calls instead of touching the
+    globally-mocked chromadb module, which can't serve realistic behavior."""
+    state = {"added": [], "deleted": []}
+
+    def _add_chunks(project_id, chunks, embeddings):
+        state["added"].append((project_id, chunks, embeddings))
+
+    def _delete_by_repo(project_id, connection_id):
+        state["deleted"].append((project_id, connection_id))
+
+    monkeypatch.setattr("temporal.activities.github_activities.add_chunks", _add_chunks)
+    monkeypatch.setattr(
+        "temporal.activities.github_activities.chroma_delete_by_repo",
+        _delete_by_repo,
+    )
+    return state
+
+
+@pytest_asyncio.fixture
+async def github_worker(
+    temporal_env: WorkflowEnvironment,
+    engine,
+    task_queue: str,
+    github_embedding_provider: ScriptedProvider,
+    chroma_github_mock: dict,
+    isolated_upload_dir,
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncGenerator[Worker, None]:
+    """A real Temporal Worker running the real GithubSyncWorkflow + activities,
+    with activities' DB access repointed at the test's in-memory engine."""
+    test_sessionmaker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    monkeypatch.setattr(
+        "temporal.activities.github_activities.AsyncSessionFactory", test_sessionmaker
+    )
+
+    worker = Worker(
+        temporal_env.client,
+        task_queue=task_queue,
+        workflows=[GithubSyncWorkflow],
+        activities=[
+            github_activities.mark_connection_syncing,
+            github_activities.fetch_repo_tree,
+            github_activities.fetch_file_contents,
+            github_activities.fetch_issues,
+            github_activities.clear_existing_vectors_for_repo,
+            github_activities.embed_and_index_github_chunks,
+            github_activities.mark_connection_synced,
+            github_activities.mark_connection_error,
+        ],
+    )
+    async with worker:
+        yield worker
+
+
+@pytest_asyncio.fixture
+async def github_integration_client(
+    client,
+    temporal_env: WorkflowEnvironment,
+    task_queue: str,
+    github_worker: Worker,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The shared HTTP `client` fixture, wired so GitHub connector routes
+    dispatch the REAL GithubSyncWorkflow on the ephemeral test server instead
+    of a stub."""
+
+    async def _fake_get_client() -> Client:
+        return temporal_env.client
+
+    monkeypatch.setattr(
+        "api.routes.github_connector.get_temporal_client", _fake_get_client
+    )
+    monkeypatch.setattr("api.routes.github_connector.TASK_QUEUE", task_queue)
     return client
