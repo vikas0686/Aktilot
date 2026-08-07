@@ -28,7 +28,7 @@ interface WelcomeModalProps {
 
 export function WelcomeModal({ open, onClose }: WelcomeModalProps) {
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="max-w-md text-center">
         <div className="flex flex-col items-center gap-6 py-2">
           {/* Logo and headline */}
