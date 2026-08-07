@@ -298,6 +298,7 @@ export function FilesTab({ projectId }: { projectId: string }) {
             icon={FileType}
             title="No files yet"
             description="Upload a document above to build this project's knowledge base."
+            subtitle="Your agent will use these documents to answer questions accurately."
           />
         )
       )}

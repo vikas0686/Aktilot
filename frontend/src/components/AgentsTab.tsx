@@ -18,6 +18,12 @@ import { CHAT_MODEL } from "@/lib/constants";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Agent } from "@/types/api";
 
+// ── Default system prompt for new agents ──────────────────────────────────────
+
+const DEFAULT_SYSTEM_PROMPT = `You are a helpful assistant. Answer questions based on the provided context from the project's documents. If the answer isn't in the context, say so clearly rather than guessing. Be concise and cite specific documents when possible.`;
+
+const DEFAULT_TOP_K = 3;
+
 // ── Create / Edit modal ───────────────────────────────────────────────────────
 
 function AgentFormModal({
@@ -29,14 +35,18 @@ function AgentFormModal({
   agent?: Agent;
   onClose: () => void;
 }) {
+  const isEdit = !!agent;
+  
+  // For new agents, use defaults. For editing, use existing values.
   const [name, setName] = useState(agent?.name ?? "");
   const [description, setDescription] = useState(agent?.description ?? "");
-  const [systemPrompt, setSystemPrompt] = useState(agent?.system_prompt ?? "");
-  const [topK, setTopK] = useState(agent?.top_k ?? 2);
+  const [systemPrompt, setSystemPrompt] = useState(
+    agent?.system_prompt ?? (isEdit ? "" : DEFAULT_SYSTEM_PROMPT)
+  );
+  const [topK, setTopK] = useState(agent?.top_k ?? DEFAULT_TOP_K);
 
   const create = useCreateAgent(projectId);
   const update = useUpdateAgent(projectId);
-  const isEdit = !!agent;
   const isPending = isEdit ? update.isPending : create.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -69,7 +79,7 @@ function AgentFormModal({
             <label className="text-sm font-medium">Name *</label>
             <input
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              placeholder="Support Bot"
+              placeholder="e.g., Support Bot, Research Assistant"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -89,11 +99,13 @@ function AgentFormModal({
           <div className="space-y-1.5">
             <label className="text-sm font-medium">System Prompt</label>
             <p className="text-xs text-muted-foreground">
-              Instructions sent to the LLM on every chat request for this agent.
+              {isEdit
+                ? "Instructions sent to the LLM on every chat request for this agent."
+                : "Tip: This default works well for most Q&A use cases. Customize it to change the agent's behavior."}
             </p>
             <textarea
               className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              placeholder="You are a helpful assistant. Answer questions based only on the provided context. If the answer is not in the context, say so clearly."
+              placeholder="You are a helpful assistant..."
               rows={6}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
@@ -103,7 +115,7 @@ function AgentFormModal({
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Chunks sent to LLM</label>
             <p className="text-xs text-muted-foreground">
-              How many top-ranked document chunks to include in each answer. Default: 2, max: 10.
+              More chunks = more context but slower responses. {DEFAULT_TOP_K} is a good default.
             </p>
             <input
               type="number"
@@ -326,7 +338,8 @@ export function AgentsTab({ projectId }: { projectId: string }) {
         <EmptyState
           icon={Bot}
           title="No agents yet"
-          description="Create an agent to start chatting with this project's documents."
+          description="Create an agent to chat with your documents."
+          subtitle="Each agent has its own personality and retrieval settings."
           action={
             <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
