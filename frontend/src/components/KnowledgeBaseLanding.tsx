@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Github, UploadCloud } from "lucide-react";
-import { useProjectFiles, useGithubConnections } from "@/hooks/useApi";
+import { useProjectFiles, useGithubConnections, useProjectAgents } from "@/hooks/useApi";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { GettingStartedCard } from "@/components/GettingStartedCard";
 import { cn } from "@/lib/utils";
 
 function SourceCard({
@@ -49,28 +52,56 @@ export function KnowledgeBaseLanding({ projectId }: { projectId: string }) {
   const navigate = useNavigate();
   const { data: files } = useProjectFiles(projectId);
   const { data: connections } = useGithubConnections(projectId);
+  const { data: agents } = useProjectAgents(projectId);
+  const { shouldShowGettingStarted, dismissGettingStarted } = useOnboarding();
+
+  // Local state to handle immediate dismissal without waiting for re-render
+  const [dismissed, setDismissed] = useState(false);
 
   const fileCount = files?.length ?? 0;
   const repoCount = connections?.length ?? 0;
+  const hasFiles = fileCount > 0 || repoCount > 0;
+  const hasAgents = (agents?.length ?? 0) > 0;
+  const firstAgentId = agents?.[0]?.id;
+
+  const showGettingStarted =
+    !dismissed && shouldShowGettingStarted(projectId, hasFiles, hasAgents);
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    dismissGettingStarted(projectId);
+  };
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <SourceCard
-        icon={UploadCloud}
-        title="Uploaded Files"
-        description="Upload PDFs and documents to build this project's knowledge base."
-        stat={fileCount > 0 ? `${fileCount} file${fileCount === 1 ? "" : "s"} uploaded` : "No files yet"}
-        cta="Upload files"
-        onClick={() => navigate("files")}
-      />
-      <SourceCard
-        icon={Github}
-        title="GitHub Repository"
-        description="Connect a GitHub repo to index its code and issues alongside your files."
-        stat={repoCount > 0 ? `${repoCount} repo${repoCount === 1 ? "" : "s"} connected` : "Not connected"}
-        cta="Connect GitHub"
-        onClick={() => navigate("github")}
-      />
+    <div className="space-y-4">
+      {showGettingStarted && (
+        <GettingStartedCard
+          projectId={projectId}
+          hasFiles={hasFiles}
+          hasAgents={hasAgents}
+          firstAgentId={firstAgentId}
+          onDismiss={handleDismiss}
+        />
+      )}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <SourceCard
+          icon={UploadCloud}
+          title="Uploaded Files"
+          description="Upload PDFs and documents to build this project's knowledge base."
+          stat={fileCount > 0 ? `${fileCount} file${fileCount === 1 ? "" : "s"} uploaded` : "No files yet"}
+          cta="Upload files"
+          onClick={() => navigate("files")}
+        />
+        <SourceCard
+          icon={Github}
+          title="GitHub Repository"
+          description="Connect a GitHub repo to index its code and issues alongside your files."
+          stat={repoCount > 0 ? `${repoCount} repo${repoCount === 1 ? "" : "s"} connected` : "Not connected"}
+          cta="Connect GitHub"
+          onClick={() => navigate("github")}
+        />
+      </div>
     </div>
   );
 }

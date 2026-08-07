@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
+import { WelcomeModal } from "@/components/WelcomeModal";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { ProjectsPage } from "@/pages/ProjectsPage";
 import { ProjectDetailPage } from "@/pages/ProjectDetailPage";
 import { KnowledgeBaseLandingRoute } from "@/pages/KnowledgeBaseLandingRoute";
@@ -14,9 +16,12 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 10_000 } },
 });
 
-export default function App() {
+function AppWithOnboarding() {
+  const { hasSeenWelcome, markWelcomeSeen } = useOnboarding();
+
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
+      <WelcomeModal open={!hasSeenWelcome} onClose={markWelcomeSeen} />
       <BrowserRouter>
         <Routes>
           {/* Standalone public chat: no AppShell, no nav to the rest of the app. */}
@@ -52,6 +57,14 @@ export default function App() {
           />
         </Routes>
       </BrowserRouter>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppWithOnboarding />
     </QueryClientProvider>
   );
 }
